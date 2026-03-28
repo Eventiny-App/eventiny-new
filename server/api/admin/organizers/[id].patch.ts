@@ -1,9 +1,11 @@
 import { z } from 'zod'
+import bcrypt from 'bcryptjs'
 
 const updateOrganizerSchema = z.object({
   name: z.string().min(2).max(100).optional(),
   enabled: z.boolean().optional(),
   expiresAt: z.string().datetime().nullable().optional(),
+  password: z.string().min(6).optional(),
 })
 
 export default defineEventHandler(async (event) => {
@@ -24,6 +26,7 @@ export default defineEventHandler(async (event) => {
   }
   if (body.enabled !== undefined) data.enabled = body.enabled
   if (body.expiresAt !== undefined) data.expiresAt = body.expiresAt ? new Date(body.expiresAt) : null
+  if (body.password !== undefined) data.passwordHash = await bcrypt.hash(body.password, 12)
 
   const organizer = await prisma.user.update({
     where: { id },

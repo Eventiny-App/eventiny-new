@@ -1,17 +1,16 @@
 export default defineEventHandler(async (event) => {
   const auth = requireAuth(event, 'superadmin', 'organizer', 'host', 'judge')
 
-  const id = getRouterParam(event, 'id')
-  if (!id) throw createError({ statusCode: 400, statusMessage: 'Missing event ID' })
+  const eventId = getRouterParam(event, 'eventId')
+  if (!eventId) throw createError({ statusCode: 400, statusMessage: 'Missing event ID' })
 
   const ev = await prisma.event.findUnique({
-    where: { id },
+    where: { id: eventId },
     select: {
       id: true,
       name: true,
       startDate: true,
       endDate: true,
-      status: true,
       createdAt: true,
       organizerId: true,
       organizer: { select: { id: true, name: true } },

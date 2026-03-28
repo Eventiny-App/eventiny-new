@@ -4,7 +4,6 @@
       <div class="flex items-center gap-3">
         <UButton variant="ghost" icon="i-lucide-arrow-left" @click="navigateTo('/organizer')" class="cursor-pointer" />
         <h1 class="text-xl font-bold">{{ eventData?.name || 'Loading...' }}</h1>
-        <UBadge v-if="eventData" :color="statusColor(eventData.status)" variant="subtle">{{ eventData.status }}</UBadge>
       </div>
       <div class="flex items-center gap-2">
         <UButton variant="ghost" icon="i-lucide-pencil" size="sm" @click="showEditEvent = true" class="cursor-pointer">
@@ -94,13 +93,10 @@
               <UInput v-model="editForm.name" class="w-full" />
             </UFormField>
             <UFormField label="Start Date" name="startDate">
-              <UInput v-model="editForm.startDate" type="datetime-local" class="w-full" />
+              <UInput v-model="editForm.startDate" type="date" class="w-full" />
             </UFormField>
             <UFormField label="End Date" name="endDate">
-              <UInput v-model="editForm.endDate" type="datetime-local" class="w-full" />
-            </UFormField>
-            <UFormField label="Status" name="status" help="Mark as 'active' when you're ready to start, 'completed' when finished.">
-              <USelect v-model="editForm.status" :items="statusOptions" class="w-full" />
+              <UInput v-model="editForm.endDate" type="date" class="w-full" />
             </UFormField>
             <div class="flex gap-2 justify-end">
               <UButton variant="ghost" @click="showEditEvent = false" class="cursor-pointer">Cancel</UButton>
@@ -134,20 +130,13 @@ onMounted(() => loadEvent())
 // Edit
 const showEditEvent = ref(false)
 const saving = ref(false)
-const statusOptions = [
-  { label: 'Draft', value: 'draft' },
-  { label: 'Active', value: 'active' },
-  { label: 'Completed', value: 'completed' },
-  { label: 'Archived', value: 'archived' },
-]
-const editForm = reactive({ name: '', startDate: '', endDate: '', status: 'draft' })
+const editForm = reactive({ name: '', startDate: '', endDate: '' })
 
 watch(showEditEvent, (v) => {
   if (v && eventData.value) {
     editForm.name = eventData.value.name
-    editForm.startDate = new Date(eventData.value.startDate).toISOString().slice(0, 16)
-    editForm.endDate = new Date(eventData.value.endDate).toISOString().slice(0, 16)
-    editForm.status = eventData.value.status
+    editForm.startDate = new Date(eventData.value.startDate).toISOString().slice(0, 10)
+    editForm.endDate = new Date(eventData.value.endDate).toISOString().slice(0, 10)
   }
 })
 
@@ -160,7 +149,6 @@ async function handleEditEvent() {
         name: editForm.name,
         startDate: new Date(editForm.startDate).toISOString(),
         endDate: new Date(editForm.endDate).toISOString(),
-        status: editForm.status,
       },
     })
     showEditEvent.value = false
@@ -171,11 +159,6 @@ async function handleEditEvent() {
 }
 
 function formatDate(d: string) {
-  return new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-}
-
-function statusColor(status: string) {
-  const map: Record<string, string> = { draft: 'neutral', active: 'success', completed: 'info', archived: 'warning' }
-  return (map[status] || 'neutral') as any
+  return new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
 }
 </script>

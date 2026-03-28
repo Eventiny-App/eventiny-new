@@ -4,17 +4,16 @@ const updateEventSchema = z.object({
   name: z.string().min(2).max(200).optional(),
   startDate: z.string().datetime().optional(),
   endDate: z.string().datetime().optional(),
-  status: z.enum(['draft', 'active', 'completed', 'archived']).optional(),
 })
 
 export default defineEventHandler(async (event) => {
   const auth = requireAuth(event, 'organizer', 'superadmin')
 
-  const id = getRouterParam(event, 'id')
-  if (!id) throw createError({ statusCode: 400, statusMessage: 'Missing event ID' })
+  const eventId = getRouterParam(event, 'eventId')
+  if (!eventId) throw createError({ statusCode: 400, statusMessage: 'Missing event ID' })
 
   // Verify ownership
-  const existing = await prisma.event.findUnique({ where: { id } })
+  const existing = await prisma.event.findUnique({ where: { id: eventId } })
   if (!existing) throw createError({ statusCode: 404, statusMessage: 'Event not found' })
   if (auth.role === 'organizer' && existing.organizerId !== auth.userId) {
     throw createError({ statusCode: 403, statusMessage: 'Not your event' })
@@ -30,7 +29,6 @@ export default defineEventHandler(async (event) => {
   }
   if (body.startDate !== undefined) data.startDate = new Date(body.startDate)
   if (body.endDate !== undefined) data.endDate = new Date(body.endDate)
-  if (body.status !== undefined) data.status = body.status
 
   // Validate date range if both provided or one changes
   const start = body.startDate ? new Date(body.startDate) : existing.startDate
@@ -40,14 +38,13 @@ export default defineEventHandler(async (event) => {
   }
 
   const updated = await prisma.event.update({
-    where: { id },
+    where: { id: eventId },
     data,
     select: {
       id: true,
       name: true,
       startDate: true,
       endDate: true,
-      status: true,
       createdAt: true,
     },
   })

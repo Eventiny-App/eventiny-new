@@ -92,7 +92,6 @@
               <div>
                 <div class="flex items-center gap-2">
                   <span class="font-medium">{{ ev.name }}</span>
-                  <UBadge :color="statusColor(ev.status)" variant="subtle">{{ ev.status }}</UBadge>
                 </div>
                 <p class="text-sm text-gray-400">
                   By {{ ev.organizer.name }} · {{ formatDate(ev.startDate) }} – {{ formatDate(ev.endDate) }}
@@ -129,7 +128,7 @@
               <UInput v-model="createForm.password" type="password" placeholder="Minimum 6 characters" class="w-full" />
             </UFormField>
             <UFormField label="Access Expiry (optional)" name="expiresAt" help="After this date, the organizer can no longer log in. Leave empty for no expiry.">
-              <UInput v-model="createForm.expiresAt" type="datetime-local" class="w-full" />
+              <UInput v-model="createForm.expiresAt" type="date" class="w-full" />
             </UFormField>
             <div class="flex gap-2 justify-end">
               <UButton variant="ghost" @click="showCreateOrganizer = false" class="cursor-pointer">Cancel</UButton>
@@ -152,8 +151,11 @@
             <UFormField label="Full Name" name="name">
               <UInput v-model="editForm.name" class="w-full" />
             </UFormField>
+            <UFormField label="New Password (optional)" name="password" help="Leave empty to keep the current password.">
+              <UInput v-model="editForm.password" type="password" placeholder="Min 6 characters" class="w-full" />
+            </UFormField>
             <UFormField label="Access Expiry" name="expiresAt" help="Change or remove the access expiry date.">
-              <UInput v-model="editForm.expiresAt" type="datetime-local" class="w-full" />
+              <UInput v-model="editForm.expiresAt" type="date" class="w-full" />
             </UFormField>
             <div class="flex gap-2 justify-end">
               <UButton variant="ghost" @click="showEditOrganizer = false" class="cursor-pointer">Cancel</UButton>
@@ -221,12 +223,13 @@ async function handleCreateOrganizer() {
 
 // Edit
 const showEditOrganizer = ref(false)
-const editForm = reactive({ id: '', name: '', expiresAt: '' })
+const editForm = reactive({ id: '', name: '', expiresAt: '', password: '' })
 
 function editOrganizer(org: any) {
   editForm.id = org.id
   editForm.name = org.name
-  editForm.expiresAt = org.expiresAt ? new Date(org.expiresAt).toISOString().slice(0, 16) : ''
+  editForm.password = ''
+  editForm.expiresAt = org.expiresAt ? new Date(org.expiresAt).toISOString().slice(0, 10) : ''
   showEditOrganizer.value = true
 }
 
@@ -238,6 +241,7 @@ async function handleEditOrganizer() {
       body: {
         name: editForm.name,
         expiresAt: editForm.expiresAt ? new Date(editForm.expiresAt).toISOString() : null,
+        ...(editForm.password ? { password: editForm.password } : {}),
       },
     })
     showEditOrganizer.value = false
@@ -277,10 +281,5 @@ onMounted(async () => {
 // Helpers
 function formatDate(d: string) {
   return new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
-}
-
-function statusColor(status: string) {
-  const map: Record<string, string> = { draft: 'neutral', active: 'success', completed: 'info', archived: 'warning' }
-  return (map[status] || 'neutral') as any
 }
 </script>

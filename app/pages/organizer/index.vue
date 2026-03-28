@@ -47,7 +47,6 @@
             <div>
               <div class="flex items-center gap-2">
                 <span class="font-medium text-lg">{{ ev.name }}</span>
-                <UBadge :color="statusColor(ev.status)" variant="subtle">{{ ev.status }}</UBadge>
               </div>
               <p class="text-sm text-gray-400 mt-1">
                 {{ formatDate(ev.startDate) }} – {{ formatDate(ev.endDate) }}
@@ -80,10 +79,10 @@
               <UInput v-model="createForm.name" placeholder="My Dance Battle" class="w-full" />
             </UFormField>
             <UFormField label="Start Date" name="startDate" help="When the event begins (participants can register before this date).">
-              <UInput v-model="createForm.startDate" type="datetime-local" class="w-full" />
+              <UInput v-model="createForm.startDate" type="date" class="w-full" />
             </UFormField>
             <UFormField label="End Date" name="endDate" help="When the event ends. Your access may expire a few days after this.">
-              <UInput v-model="createForm.endDate" type="datetime-local" class="w-full" />
+              <UInput v-model="createForm.endDate" type="date" class="w-full" />
             </UFormField>
             <div class="flex gap-2 justify-end">
               <UButton variant="ghost" @click="showCreate = false" class="cursor-pointer">Cancel</UButton>
@@ -151,10 +150,5 @@ async function handleCreate() {
 
 function formatDate(d: string) {
   return new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
-}
-
-function statusColor(status: string) {
-  const map: Record<string, string> = { draft: 'neutral', active: 'success', completed: 'info', archived: 'warning' }
-  return (map[status] || 'neutral') as any
 }
 </script>

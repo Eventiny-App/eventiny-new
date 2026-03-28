@@ -11,6 +11,10 @@ export default defineNuxtConfig({
     '@vite-pwa/nuxt',
   ],
 
+  colorMode: {
+    preference: 'dark',
+  },
+
   css: ['~/assets/css/main.css'],
 
   runtimeConfig: {

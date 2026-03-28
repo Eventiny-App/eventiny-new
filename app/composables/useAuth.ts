@@ -13,6 +13,7 @@ interface AuthState {
   judgeId?: string | null
   hostId?: string | null
   eventId?: string | null
+  name?: string | null
 }
 
 export function useAuth() {
@@ -56,6 +57,7 @@ export function useAuth() {
         token: data.token,
         judgeId: data.judge.id,
         eventId: data.judge.eventId,
+        name: data.judge.name,
       }
     } else if (role === 'host' && 'host' in data) {
       state.value = {
@@ -64,6 +66,7 @@ export function useAuth() {
         token: data.token,
         hostId: data.host.id,
         eventId: data.host.eventId,
+        name: data.host.name,
       }
     }
     return data
@@ -85,6 +88,7 @@ export function useAuth() {
           token: state.value.token,
           judgeId: data.judge.id,
           eventId: data.eventId,
+          name: data.judge.name,
         }
       } else if ('host' in data && data.host) {
         state.value = {
@@ -93,6 +97,7 @@ export function useAuth() {
           token: state.value.token,
           hostId: data.host.id,
           eventId: data.eventId,
+          name: data.host.name,
         }
       }
     } catch {
@@ -108,6 +113,7 @@ export function useAuth() {
 
   return {
     state,
+    user: computed(() => state.value.user),
     isLoggedIn,
     isAdmin,
     isOrganizer,

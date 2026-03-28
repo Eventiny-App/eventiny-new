@@ -10,7 +10,6 @@ export default defineEventHandler(async (event) => {
       name: true,
       startDate: true,
       endDate: true,
-      status: true,
       createdAt: true,
       organizer: { select: { id: true, name: true } },
       _count: { select: { categories: true, participants: true, judges: true, hosts: true } },

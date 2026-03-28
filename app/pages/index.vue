@@ -14,7 +14,7 @@
         <!-- Admin / Organizer Login -->
         <div v-if="activeTab === 'login'">
           <p class="text-sm text-gray-400 mb-4">
-            Log in as an event organizer or administrator.
+            Log in as the platform administrator or as an event organizer. Both use email and password.
           </p>
           <UForm :state="loginForm" :validate="validateLogin" class="space-y-4" @submit="handleLogin">
             <UFormField label="Email" name="email" help="The email address provided by the administrator.">
@@ -69,7 +69,7 @@ onMounted(async () => {
 
 const activeTab = ref('login')
 const tabs = [
-  { label: 'Organizer Login', value: 'login' },
+  { label: 'Admin / Organizer', value: 'login' },
   { label: 'Judge / Host', value: 'pin' },
 ]
 

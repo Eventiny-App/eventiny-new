@@ -30,7 +30,6 @@ model Event {
   name       String
   startDate  DateTime
   endDate    DateTime
-  status     String   @default("draft") // draft | active | completed | archived
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -50,7 +49,6 @@ model Category {
   name             String
   type             String  // battle | choreo
   bracketSize      Int?    // 4, 8, 16, 32, or custom number (null for choreo without battle phase)
-  eliminationMode  String  @default("single") // single | double
   battleVotingMode String  @default("hands") // hands | app (how battle winners are decided)
   choreoBattleTop  Int?    // if choreo, optionally battle the top N crews
   status           String  @default("idle") // idle | preselection | ranking | playoffs | battles | completed
@@ -249,7 +247,7 @@ model BattleMatchup {
   id       String  @id @default(cuid())
   round    Int     // 1 = first round, 2 = quarter-final, etc.
   position Int     // position within the round (for bracket layout)
-  bracket  String  @default("winners") // winners | losers | grand_final (for double-elimination)
+  bracket  String  @default("winners") // always 'winners' for single elimination
 
   participant1Id String?
   participant1   Participant? @relation("MatchupParticipant1", fields: [participant1Id], references: [id])

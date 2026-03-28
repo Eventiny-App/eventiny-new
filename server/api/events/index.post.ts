@@ -32,7 +32,6 @@ export default defineEventHandler(async (event) => {
       name: true,
       startDate: true,
       endDate: true,
-      status: true,
       createdAt: true,
     },
   })
