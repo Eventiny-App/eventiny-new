@@ -1,0 +1,20 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "jsx": "react-jsx",
+    "types": ["vite/client"],
+    "baseUrl": ".",
+    "paths": {
+      "@eventiny/domain": ["../../packages/domain/src"],
+      "@eventiny/application": ["../../packages/application/src"],
+      "@eventiny/adapters-firebase": ["../../packages/adapters-firebase/src"]
+    }
+  },
+  "references": [
+    { "path": "../../packages/domain" },
+    { "path": "../../packages/application" },
+    { "path": "../../packages/adapters-firebase" }
+  ],
+  "include": ["src", "vite.config.ts"]
+}

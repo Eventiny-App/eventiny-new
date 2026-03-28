@@ -1,0 +1,16 @@
+{
+  "name": "@eventiny/adapters-firebase",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "dev": "tsc -b -w"
+  },
+  "dependencies": {
+    "@eventiny/application": "0.1.0",
+    "@eventiny/domain": "0.1.0",
+    "firebase": "^11.6.1"
+  }
+}

@@ -1,0 +1,180 @@
+:root {
+  font-family: "Space Grotesk", "Segoe UI", sans-serif;
+  color: #101828;
+  background: radial-gradient(circle at 10% 20%, #fef3c7, #ffffff 45%, #dbeafe 100%);
+  line-height: 1.4;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+.layout {
+  margin: 0 auto;
+  max-width: 1150px;
+  padding: 1rem;
+}
+
+.hero {
+  background: #111827;
+  color: #f9fafb;
+  border-radius: 16px;
+  padding: 1.25rem;
+}
+
+.kicker {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.8rem;
+  margin-bottom: 0.4rem;
+  color: #fde68a;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.card {
+  background: #ffffffcc;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 0.9rem;
+}
+
+.cardWide {
+  padding: 1rem;
+}
+
+.roleSwitcher {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.roleButton {
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  border-radius: 999px;
+  padding: 0.4rem 0.8rem;
+  cursor: pointer;
+  text-transform: capitalize;
+}
+
+.roleButtonActive {
+  border-color: #1d4ed8;
+  background: #dbeafe;
+}
+
+.formRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+
+input,
+select,
+button {
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 0.45rem 0.6rem;
+  font: inherit;
+}
+
+button {
+  background: #111827;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+select[multiple] {
+  min-width: 220px;
+  min-height: 80px;
+}
+
+.list {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 0.8rem;
+}
+
+.listItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 0.65rem;
+  background: #ffffff;
+}
+
+.listItemBlock {
+  align-items: flex-start;
+}
+
+.muted {
+  margin: 0.3rem 0 0;
+  color: #4b5563;
+  font-size: 0.92rem;
+}
+
+.warning {
+  margin: 0.4rem 0 0;
+  color: #9a3412;
+  font-size: 0.9rem;
+}
+
+.actionsInline {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.panel {
+  margin-top: 1rem;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 14px;
+  padding: 1rem;
+}
+
+ul {
+  margin: 0.6rem 0 0;
+  padding-left: 1rem;
+}
+
+@media (max-width: 640px) {
+  .hero {
+    padding: 1rem;
+  }
+
+  .layout {
+    padding: 0.75rem;
+  }
+
+  .listItem {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .actionsInline {
+    width: 100%;
+  }
+
+  .actionsInline button {
+    flex: 1;
+  }
+}

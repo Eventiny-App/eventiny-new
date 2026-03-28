@@ -1,0 +1,58 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isCreator() {
+      return request.auth != null && request.auth.token.role == 'creator';
+    }
+
+    function isOrganizer() {
+      return request.auth != null && request.auth.token.role == 'organizer';
+    }
+
+    function isHost() {
+      return request.auth != null && request.auth.token.role == 'host';
+    }
+
+    function isJudge() {
+      return request.auth != null && request.auth.token.role == 'judge';
+    }
+
+    function hasEventAccess(eventId) {
+      return request.auth != null &&
+        exists(/databases/$(database)/documents/events/$(eventId)/organizerAccess/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/events/$(eventId)/organizerAccess/$(request.auth.uid)).data.revokedAtIso == null;
+    }
+
+    match /events/{eventId} {
+      allow read: if isCreator() || hasEventAccess(eventId);
+      allow create, update, delete: if isCreator();
+
+      match /organizerAccess/{organizerId} {
+        allow read: if isCreator() || request.auth.uid == organizerId;
+        allow write: if isCreator();
+      }
+    }
+
+    match /categories/{categoryId} {
+      allow read: if request.auth != null;
+      allow create, update, delete: if isCreator() || isOrganizer();
+
+      match /participants/{participantId} {
+        allow read: if request.auth != null;
+        allow create, update: if isCreator() || isOrganizer();
+        allow delete: if false;
+      }
+
+      match /runtime/{docId} {
+        allow read: if request.auth != null;
+        allow write: if isCreator() || isOrganizer() || isHost();
+      }
+
+      match /votes/{voteId} {
+        allow read: if isCreator() || isOrganizer() || isHost() || isJudge();
+        allow create, update: if isJudge() || isHost();
+        allow delete: if false;
+      }
+    }
+  }
+}
