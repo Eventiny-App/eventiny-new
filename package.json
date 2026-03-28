@@ -1,0 +1,33 @@
+{
+  "name": "eventiny",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare && prisma generate",
+    "db:push": "prisma db push",
+    "db:studio": "prisma studio",
+    "db:seed": "npx tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@nuxt/ui": "^3",
+    "@pinia/nuxt": "^0.9",
+    "@prisma/client": "^6",
+    "@vite-pwa/nuxt": "^0.10",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
+    "nuxt": "^3.17",
+    "pinia": "^2.3",
+    "zod": "^3.24"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jsonwebtoken": "^9.0.9",
+    "prisma": "^6",
+    "tsx": "^4",
+    "typescript": "^5.8"
+  }
+}

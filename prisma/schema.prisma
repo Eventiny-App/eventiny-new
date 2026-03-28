@@ -1,0 +1,286 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Users & Auth ────────────────────────────────────────────
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  role         String    @default("organizer") // superadmin | organizer
+  name         String
+  enabled      Boolean   @default(true)
+  expiresAt    DateTime? // organizer access expiry (null = never for superadmin)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  events Event[]
+}
+
+// ─── Events ──────────────────────────────────────────────────
+
+model Event {
+  id         String   @id @default(cuid())
+  name       String
+  startDate  DateTime
+  endDate    DateTime
+  status     String   @default("draft") // draft | active | completed | archived
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  organizerId String
+  organizer   User   @relation(fields: [organizerId], references: [id])
+
+  categories   Category[]
+  participants Participant[]
+  judges       Judge[]
+  hosts        Host[]
+}
+
+// ─── Categories ──────────────────────────────────────────────
+
+model Category {
+  id               String  @id @default(cuid())
+  name             String
+  type             String  // battle | choreo
+  bracketSize      Int?    // 4, 8, 16, 32, or custom number (null for choreo without battle phase)
+  eliminationMode  String  @default("single") // single | double
+  battleVotingMode String  @default("hands") // hands | app (how battle winners are decided)
+  choreoBattleTop  Int?    // if choreo, optionally battle the top N crews
+  status           String  @default("idle") // idle | preselection | ranking | playoffs | battles | completed
+  sortOrder        Int     @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  eventId String
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  choreoThemes          ChoreoTheme[]
+  participantCategories ParticipantCategory[]
+  judgeCategories       JudgeCategory[]
+  hostCategories        HostCategory[]
+  preselectionVotes     PreselectionVote[]
+  choreoVotes           ChoreoVote[]
+  categoryState         CategoryState?
+  battleMatchups        BattleMatchup[]
+}
+
+// ─── Choreo Voting Themes ────────────────────────────────────
+
+model ChoreoTheme {
+  id        String @id @default(cuid())
+  name      String // e.g. "Originality", "Technique", "Style"
+  sortOrder Int    @default(0)
+
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  choreoVotes ChoreoVote[]
+}
+
+// ─── Participants ────────────────────────────────────────────
+
+model Participant {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  eventId String
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  participantCategories ParticipantCategory[]
+  preselectionVotes     PreselectionVote[]
+  choreoVotes           ChoreoVote[]
+  matchupsAsP1          BattleMatchup[]       @relation("MatchupParticipant1")
+  matchupsAsP2          BattleMatchup[]       @relation("MatchupParticipant2")
+  matchupsWon           BattleMatchup[]       @relation("MatchupWinner")
+  battleVotes           BattleVote[]
+}
+
+// ─── Participant ↔ Category (M:N) ───────────────────────────
+
+model ParticipantCategory {
+  id            String   @id @default(cuid())
+  orderPosition Int?     // set when category is opened (random), late = appended
+  withdrawn     Boolean  @default(false) // soft-delete: true if removed after category started
+  registeredAt  DateTime @default(now())
+
+  participantId String
+  participant   Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([participantId, categoryId])
+}
+
+// ─── Judges ──────────────────────────────────────────────────
+
+model Judge {
+  id        String @id @default(cuid())
+  name      String
+  accessPin String // unique per event, 4-6 digit PIN
+
+  eventId String
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  judgeCategories   JudgeCategory[]
+  preselectionVotes PreselectionVote[]
+  choreoVotes       ChoreoVote[]
+  battleVotes       BattleVote[]
+
+  @@unique([eventId, accessPin])
+}
+
+// ─── Judge ↔ Category (M:N with weight) ─────────────────────
+
+model JudgeCategory {
+  id     String @id @default(cuid())
+  weight Float  @default(1.0) // higher weight = more influence in app-voting battle mode
+
+  judgeId String
+  judge   Judge @relation(fields: [judgeId], references: [id], onDelete: Cascade)
+
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([judgeId, categoryId])
+}
+
+// ─── Hosts ───────────────────────────────────────────────────
+
+model Host {
+  id        String @id @default(cuid())
+  name      String
+  accessPin String // unique per event
+
+  eventId String
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  hostCategories HostCategory[]
+
+  @@unique([eventId, accessPin])
+}
+
+// ─── Host ↔ Category (M:N) ──────────────────────────────────
+
+model HostCategory {
+  id String @id @default(cuid())
+
+  hostId String
+  host   Host @relation(fields: [hostId], references: [id], onDelete: Cascade)
+
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([hostId, categoryId])
+}
+
+// ─── Preselection Votes ──────────────────────────────────────
+
+model PreselectionVote {
+  id    String @id @default(cuid())
+  score Float  // 0.0 to 10.0, step 0.1
+
+  judgeId String
+  judge   Judge @relation(fields: [judgeId], references: [id], onDelete: Cascade)
+
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  participantId String
+  participant   Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([judgeId, categoryId, participantId])
+}
+
+// ─── Choreo Votes (per theme) ────────────────────────────────
+
+model ChoreoVote {
+  id    String @id @default(cuid())
+  score Float  // 0.0 to 10.0, step 0.1
+
+  judgeId String
+  judge   Judge @relation(fields: [judgeId], references: [id], onDelete: Cascade)
+
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  participantId String
+  participant   Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  themeId String
+  theme   ChoreoTheme @relation(fields: [themeId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([judgeId, categoryId, participantId, themeId])
+}
+
+// ─── Category Live State ─────────────────────────────────────
+
+model CategoryState {
+  id                   String  @id @default(cuid())
+  phase                String  @default("idle") // idle | preselection | ranking | playoffs | battles | completed
+  currentParticipantId String? // who is currently performing (for judge highlight)
+  currentMatchupId     String? // current battle matchup being shown
+  currentRound         Int?    // current round in bracket
+  timerDuration        Int     @default(60) // seconds per performer (advisory)
+  updatedAt            DateTime @updatedAt
+
+  categoryId String   @unique
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+}
+
+// ─── Battle Matchups (bracket entries) ───────────────────────
+
+model BattleMatchup {
+  id       String  @id @default(cuid())
+  round    Int     // 1 = first round, 2 = quarter-final, etc.
+  position Int     // position within the round (for bracket layout)
+  bracket  String  @default("winners") // winners | losers | grand_final (for double-elimination)
+
+  participant1Id String?
+  participant1   Participant? @relation("MatchupParticipant1", fields: [participant1Id], references: [id])
+
+  participant2Id String?
+  participant2   Participant? @relation("MatchupParticipant2", fields: [participant2Id], references: [id])
+
+  winnerId String?
+  winner   Participant? @relation("MatchupWinner", fields: [winnerId], references: [id])
+
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  battleVotes BattleVote[]
+}
+
+// ─── Battle Votes (judge picks winner in a matchup) ──────────
+
+model BattleVote {
+  id String @id @default(cuid())
+
+  matchupId String
+  matchup   BattleMatchup @relation(fields: [matchupId], references: [id], onDelete: Cascade)
+
+  judgeId String
+  judge   Judge @relation(fields: [judgeId], references: [id], onDelete: Cascade)
+
+  votedParticipantId String
+  votedParticipant   Participant @relation(fields: [votedParticipantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([matchupId, judgeId])
+}
