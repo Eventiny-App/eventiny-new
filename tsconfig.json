@@ -1,9 +1,13 @@
 {
-  "files": [],
-  "references": [
-    { "path": "packages/domain" },
-    { "path": "packages/application" },
-    { "path": "packages/adapters-firebase" },
-    { "path": "apps/web" }
-  ]
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "jsx": "preserve",
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  }
 }

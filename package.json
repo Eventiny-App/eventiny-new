@@ -1,18 +1,32 @@
 {
-  "name": "eventiny-new",
-  "version": "0.1.0",
+  "name": "eventiny",
   "private": true,
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
+  "type": "module",
   "scripts": {
-    "dev": "npm run dev --workspace @eventiny/web",
-    "build": "npm run build --workspaces",
-    "typecheck": "tsc -b",
-    "lint": "echo \"No linter configured yet\""
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare && prisma generate",
+    "db:push": "prisma db push",
+    "db:studio": "prisma studio",
+    "db:seed": "npx tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@nuxt/ui": "^3",
+    "@prisma/client": "^6",
+    "@vite-pwa/nuxt": "^0.10",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
+    "nuxt": "^3.17",
+    "zod": "^3.24"
   },
   "devDependencies": {
-    "typescript": "^5.8.2"
+    "@iconify-json/lucide": "^1.2.100",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jsonwebtoken": "^9.0.9",
+    "prisma": "^6",
+    "tsx": "^4",
+    "typescript": "^5.8"
   }
 }

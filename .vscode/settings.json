@@ -1,5 +1,18 @@
 {
     "chat.tools.terminal.autoApprove": {
-        "mv": true
+        "mv": true,
+        "C": true,
+        "/^TOKEN=\\$\\(curl -s http://localhost:3000/api/auth/login -X POST -H 'Content-Type: application/json' -d '\\{\"email\":\"admin@eventiny\\.app\",\"password\":\"admin123\"\\}' \\| python3 -c \"import sys,json;print\\(json\\.load\\(sys\\.stdin\\)\\['token'\\]\\)\"\\) && echo \"Got token: \\$\\{TOKEN:0:20\\}\\.\\.\\.\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^TOKEN=\\$\\(curl -s http://localhost:3000/api/auth/login -X POST -H 'Content-Type: application/json' -d '\\{\"email\":\"nikten96@gmail\\.com\",\"password\":\"changeme\"\\}' \\| python3 -c \"import sys,json; print\\(json\\.load\\(sys\\.stdin\\)\\['token'\\]\\)\"\\) && curl -s -w '\\\\n%\\{http_code\\}' \"http://localhost:3000/api/events/cmnaenhiz00021a1q0w4ur7hp/categories\" -H \"Authorization: Bearer \\$TOKEN\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^sleep 5 && TOKEN=\\$\\(curl -s http://localhost:3000/api/auth/login -X POST -H 'Content-Type: application/json' -d '\\{\"email\":\"nikten96@gmail\\.com\",\"password\":\"changeme\"\\}' \\| python3 -c \"import sys,json; print\\(json\\.load\\(sys\\.stdin\\)\\['token'\\]\\)\"\\) && echo \"=== GET /api/events/cmnaenhiz00021a1q0w4ur7hp ===\" && curl -s -w '\\\\nHTTP %\\{http_code\\}' \"http://localhost:3000/api/events/cmnaenhiz00021a1q0w4ur7hp\" -H \"Authorization: Bearer \\$TOKEN\" && echo && echo \"=== GET /api/events/cmnaenhiz00021a1q0w4ur7hp/categories ===\" && curl -s -w '\\\\nHTTP %\\{http_code\\}' \"http://localhost:3000/api/events/cmnaenhiz00021a1q0w4ur7hp/categories\" -H \"Authorization: Bearer \\$TOKEN\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
     }
 }

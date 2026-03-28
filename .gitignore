@@ -1,8 +1,9 @@
 node_modules/
+.nuxt/
+.output/
 dist/
+*.db
+*.db-journal
 .env
-.env.local
-*.log
-.firebase/
-.DS_Store
-coverage/
+.env.*
+!.env.example
