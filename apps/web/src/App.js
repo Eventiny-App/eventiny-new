@@ -2,12 +2,45 @@ import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-run
 import { useMemo, useState } from "react";
 import { CategoryStartService } from "@eventiny/application";
 import { computeRanking } from "@eventiny/domain";
+const CREATOR_DEV_USERNAME = "creator";
+const CREATOR_DEV_PASSWORD = "creator123";
+const STORAGE_KEY = "eventiny-local-dev-state-v1";
+function newId(prefix) {
+    return `${prefix}_${Math.random().toString(36).slice(2, 8)}`;
+}
+function loadPersistedState() {
+    try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) {
+            return {
+                organizerCredentials: [],
+                categories: [],
+                participants: []
+            };
+        }
+        const parsed = JSON.parse(raw);
+        return {
+            organizerCredentials: parsed.organizerCredentials ?? [],
+            categories: parsed.categories ?? [],
+            participants: parsed.participants ?? [],
+            simulation: parsed.simulation
+        };
+    }
+    catch {
+        return {
+            organizerCredentials: [],
+            categories: [],
+            participants: []
+        };
+    }
+}
+function persistState(next) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+}
 class InMemoryCategoryParticipantsRepository {
-    categoriesRef;
     participantsRef;
     setCategories;
-    constructor(categoriesRef, participantsRef, setCategories) {
-        this.categoriesRef = categoriesRef;
+    constructor(participantsRef, setCategories) {
         this.participantsRef = participantsRef;
         this.setCategories = setCategories;
     }
@@ -32,16 +65,23 @@ class InMemoryCategoryParticipantsRepository {
             : category));
     }
 }
-function newId(prefix) {
-    return `${prefix}_${Math.random().toString(36).slice(2, 8)}`;
+function categoryLabel(category) {
+    if (category.type === "battle") {
+        return `${category.name} (${category.battleFormat}${category.battleFormat === "CUSTOM" ? `:${category.customBattleSize}` : ""})`;
+    }
+    return `${category.name} (choreo)`;
 }
 export function App() {
-    const [activeRole, setActiveRole] = useState("creator");
-    const [organizerAccess, setOrganizerAccess] = useState([]);
-    const [categories, setCategories] = useState([]);
-    const [participants, setParticipants] = useState([]);
-    const [participantSearch, setParticipantSearch] = useState("");
-    const [editingParticipantId, setEditingParticipantId] = useState(null);
+    const initialState = useMemo(() => loadPersistedState(), []);
+    const [session, setSession] = useState(null);
+    const [organizerCredentials, setOrganizerCredentials] = useState(initialState.organizerCredentials);
+    const [categories, setCategories] = useState(initialState.categories);
+    const [participants, setParticipants] = useState(initialState.participants);
+    const [simulation, setSimulation] = useState(initialState.simulation ?? null);
+    const [loginMode, setLoginMode] = useState("creator");
+    const [loginUsername, setLoginUsername] = useState("");
+    const [loginPassword, setLoginPassword] = useState("");
+    const [loginError, setLoginError] = useState("");
     const [newOrganizerName, setNewOrganizerName] = useState("");
     const [newOrganizerEventId, setNewOrganizerEventId] = useState("event_2026");
     const [newOrganizerExpiryDays, setNewOrganizerExpiryDays] = useState(3);
@@ -53,62 +93,129 @@ export function App() {
     const [newChoreoBattleSize, setNewChoreoBattleSize] = useState(0);
     const [newParticipantName, setNewParticipantName] = useState("");
     const [selectedCategoryIds, setSelectedCategoryIds] = useState([]);
-    const categoryParticipantsRepo = useMemo(() => new InMemoryCategoryParticipantsRepository(() => categories, () => participants, setCategories), [categories, participants]);
+    const [participantSearch, setParticipantSearch] = useState("");
+    const [editingParticipantId, setEditingParticipantId] = useState(null);
+    const [simulationCategoryId, setSimulationCategoryId] = useState("");
+    const [simulationCutoff, setSimulationCutoff] = useState(16);
+    const categoryParticipantsRepo = useMemo(() => new InMemoryCategoryParticipantsRepository(() => participants, setCategories), [participants]);
     const categoryStartService = useMemo(() => new CategoryStartService(categoryParticipantsRepo), [categoryParticipantsRepo]);
+    const currentOrganizer = useMemo(() => {
+        if (!session || session.role !== "organizer") {
+            return null;
+        }
+        return organizerCredentials.find((entry) => entry.id === session.organizerId) ?? null;
+    }, [session, organizerCredentials]);
+    const organizerCategories = useMemo(() => {
+        if (!currentOrganizer) {
+            return [];
+        }
+        return categories.filter((entry) => entry.eventId === currentOrganizer.eventId);
+    }, [categories, currentOrganizer]);
     const filteredParticipants = useMemo(() => {
+        if (!currentOrganizer) {
+            return [];
+        }
+        const eventCategoryIds = new Set(organizerCategories.map((category) => category.id));
+        const scoped = participants.filter((participant) => participant.categoryIds.some((id) => eventCategoryIds.has(id)));
         const search = participantSearch.trim().toLowerCase();
         if (!search) {
-            return participants;
+            return scoped;
         }
-        return participants.filter((participant) => {
-            const nameMatch = participant.displayName.toLowerCase().includes(search);
-            const categoryMatch = participant.categoryIds.some((categoryId) => {
-                const category = categories.find((entry) => entry.id === categoryId);
+        return scoped.filter((participant) => {
+            const matchesName = participant.displayName.toLowerCase().includes(search);
+            const matchesCategory = participant.categoryIds.some((categoryId) => {
+                const category = organizerCategories.find((item) => item.id === categoryId);
                 return category?.name.toLowerCase().includes(search) ?? false;
             });
-            return nameMatch || categoryMatch;
+            return matchesName || matchesCategory;
         });
-    }, [participantSearch, participants, categories]);
-    const tieDemo = useMemo(() => computeRanking([
-        { judgeId: "j1", participantId: "p1", score: 9 },
-        { judgeId: "j2", participantId: "p1", score: 8 },
-        { judgeId: "j1", participantId: "p2", score: 9 },
-        { judgeId: "j2", participantId: "p2", score: 8 },
-        { judgeId: "j1", participantId: "p3", score: 7 },
-        { judgeId: "j2", participantId: "p3", score: 8 }
-    ], 2), []);
-    function createOrganizerAccess() {
-        if (!newOrganizerName.trim()) {
+    }, [currentOrganizer, organizerCategories, participants, participantSearch]);
+    const rankingView = useMemo(() => {
+        if (!simulation) {
+            return null;
+        }
+        return computeRanking(simulation.votes, simulation.cutoff);
+    }, [simulation]);
+    function saveAll(next) {
+        const merged = {
+            organizerCredentials,
+            categories,
+            participants,
+            simulation: simulation ?? undefined,
+            ...next
+        };
+        persistState(merged);
+    }
+    function logout() {
+        setSession(null);
+        setLoginUsername("");
+        setLoginPassword("");
+        setLoginError("");
+    }
+    function login() {
+        setLoginError("");
+        if (loginMode === "creator") {
+            if (loginUsername === CREATOR_DEV_USERNAME && loginPassword === CREATOR_DEV_PASSWORD) {
+                setSession({ role: "creator" });
+                return;
+            }
+            setLoginError("Invalid creator credentials");
             return;
         }
-        const now = new Date();
-        const expiresAt = new Date(now.getTime() + newOrganizerExpiryDays * 24 * 60 * 60 * 1000);
-        setOrganizerAccess((prev) => [
-            {
-                organizerId: newId("org"),
-                organizerName: newOrganizerName.trim(),
-                eventId: newOrganizerEventId.trim(),
-                expiresAtIso: expiresAt.toISOString()
-            },
-            ...prev
-        ]);
+        const credential = organizerCredentials.find((entry) => entry.username === loginUsername && entry.password === loginPassword);
+        if (!credential) {
+            setLoginError("Invalid organizer credentials");
+            return;
+        }
+        if (credential.revokedAtIso) {
+            setLoginError("Organizer access was revoked by creator");
+            return;
+        }
+        if (new Date(credential.expiresAtIso).getTime() <= Date.now()) {
+            setLoginError("Organizer access is expired");
+            return;
+        }
+        setSession({ role: "organizer", organizerId: credential.id });
+    }
+    function createOrganizerAccess() {
+        if (!newOrganizerName.trim() || !newOrganizerEventId.trim()) {
+            return;
+        }
+        const seed = newOrganizerName.trim().toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 8) || "organizer";
+        const now = Date.now();
+        const username = `${seed}_${Math.random().toString(36).slice(2, 5)}`;
+        const password = Math.random().toString(36).slice(2, 10);
+        const nextEntry = {
+            id: newId("org"),
+            organizerName: newOrganizerName.trim(),
+            username,
+            password,
+            eventId: newOrganizerEventId.trim(),
+            expiresAtIso: new Date(now + newOrganizerExpiryDays * 24 * 60 * 60 * 1000).toISOString()
+        };
+        const next = [nextEntry, ...organizerCredentials];
+        setOrganizerCredentials(next);
+        saveAll({ organizerCredentials: next });
         setNewOrganizerName("");
     }
     function revokeOrganizerAccess(organizerId) {
-        setOrganizerAccess((prev) => prev.map((record) => record.organizerId === organizerId
+        const next = organizerCredentials.map((entry) => entry.id === organizerId
             ? {
-                ...record,
+                ...entry,
                 revokedAtIso: new Date().toISOString()
             }
-            : record));
+            : entry);
+        setOrganizerCredentials(next);
+        saveAll({ organizerCredentials: next });
     }
     function createCategory() {
-        if (!newCategoryName.trim()) {
+        if (!currentOrganizer || !newCategoryName.trim()) {
             return;
         }
         const base = {
             id: newId("cat"),
             name: newCategoryName.trim(),
+            eventId: currentOrganizer.eventId,
             type: newCategoryType,
             isStarted: false,
             runOrderParticipantIds: []
@@ -127,11 +234,17 @@ export function App() {
                     .filter(Boolean),
                 choreographyStartsBattleSize: newChoreoBattleSize > 0 ? newChoreoBattleSize : undefined
             };
-        setCategories((prev) => [category, ...prev]);
+        const next = [category, ...categories];
+        setCategories(next);
+        saveAll({ categories: next });
         setNewCategoryName("");
+        if (!simulationCategoryId) {
+            setSimulationCategoryId(category.id);
+        }
     }
     async function startCategory(categoryId) {
         await categoryStartService.startCategoryWithRandomOrder(categoryId);
+        saveAll({ categories });
     }
     async function registerParticipant() {
         if (!newParticipantName.trim() || selectedCategoryIds.length === 0) {
@@ -143,31 +256,89 @@ export function App() {
             categoryIds: selectedCategoryIds,
             createdAtIso: new Date().toISOString()
         };
-        setParticipants((prev) => [participant, ...prev]);
-        // Late registration is appended to categories that have already started.
-        const startedCategories = categories.filter((category) => category.isStarted && selectedCategoryIds.includes(category.id));
+        const nextParticipants = [participant, ...participants];
+        setParticipants(nextParticipants);
+        const startedCategories = organizerCategories.filter((category) => category.isStarted && selectedCategoryIds.includes(category.id));
         for (const category of startedCategories) {
             await categoryStartService.appendLateRegistration(category.id, participant.id);
         }
         setNewParticipantName("");
         setSelectedCategoryIds([]);
+        saveAll({ participants: nextParticipants, categories });
     }
     function updateParticipant(participantId, patch) {
-        setParticipants((prev) => prev.map((participant) => (participant.id === participantId ? { ...participant, ...patch } : participant)));
+        const next = participants.map((participant) => (participant.id === participantId ? { ...participant, ...patch } : participant));
+        setParticipants(next);
+        saveAll({ participants: next });
     }
-    function roleButtonClass(role) {
-        return activeRole === role ? "roleButton roleButtonActive" : "roleButton";
+    function removeParticipant(participantId) {
+        const participant = participants.find((entry) => entry.id === participantId);
+        if (!participant) {
+            return;
+        }
+        const inStartedCategory = participant.categoryIds.some((categoryId) => categories.find((entry) => entry.id === categoryId)?.isStarted);
+        if (inStartedCategory) {
+            return;
+        }
+        const next = participants.filter((entry) => entry.id !== participantId);
+        setParticipants(next);
+        saveAll({ participants: next });
     }
-    return (_jsxs("main", { className: "layout", children: [_jsxs("header", { className: "hero", children: [_jsx("p", { className: "kicker", children: "Eventiny Interactive MVP" }), _jsx("h1", { children: "Creator and organizer workflows are now interactive" }), _jsx("p", { children: "This screen runs in local memory for fast iteration. Firebase repositories are already wired in the monorepo and can replace in-memory data in the next step without changing domain rules." })] }), _jsx("section", { className: "roleSwitcher", children: ["creator", "organizer", "host", "judge"].map((role) => (_jsx("button", { type: "button", onClick: () => setActiveRole(role), className: roleButtonClass(role), children: role }, role))) }), _jsxs("section", { className: "grid", children: [_jsxs("article", { className: "card cardWide", children: [_jsx("h2", { children: "Creator: Organizer Access" }), activeRole !== "creator" && _jsx("p", { className: "muted", children: "Switch to creator role to manage access." }), _jsxs("div", { className: "formRow", children: [_jsx("input", { placeholder: "Organizer name", value: newOrganizerName, onChange: (event) => setNewOrganizerName(event.target.value), disabled: activeRole !== "creator" }), _jsx("input", { placeholder: "Event id", value: newOrganizerEventId, onChange: (event) => setNewOrganizerEventId(event.target.value), disabled: activeRole !== "creator" }), _jsx("input", { type: "number", min: 1, value: newOrganizerExpiryDays, onChange: (event) => setNewOrganizerExpiryDays(Number(event.target.value)), disabled: activeRole !== "creator" }), _jsx("button", { type: "button", onClick: createOrganizerAccess, disabled: activeRole !== "creator", children: "Create access" })] }), _jsxs("div", { className: "list", children: [organizerAccess.length === 0 && _jsx("p", { className: "muted", children: "No organizer access records yet." }), organizerAccess.map((record) => {
-                                        const status = record.revokedAtIso ? "revoked" : new Date(record.expiresAtIso) < new Date() ? "expired" : "active";
-                                        return (_jsxs("div", { className: "listItem", children: [_jsxs("div", { children: [_jsx("strong", { children: record.organizerName }), _jsxs("p", { className: "muted", children: ["Event: ", record.eventId, " | Expires: ", new Date(record.expiresAtIso).toLocaleString(), " | Status: ", status] })] }), _jsx("button", { type: "button", onClick: () => revokeOrganizerAccess(record.organizerId), disabled: activeRole !== "creator" || status !== "active", children: "Revoke" })] }, record.organizerId));
-                                    })] })] }), _jsxs("article", { className: "card cardWide", children: [_jsx("h2", { children: "Organizer: Categories" }), activeRole !== "organizer" && _jsx("p", { className: "muted", children: "Switch to organizer role to create and start categories." }), _jsxs("div", { className: "formRow", children: [_jsx("input", { placeholder: "Category name", value: newCategoryName, onChange: (event) => setNewCategoryName(event.target.value), disabled: activeRole !== "organizer" }), _jsxs("select", { value: newCategoryType, onChange: (event) => setNewCategoryType(event.target.value), disabled: activeRole !== "organizer", children: [_jsx("option", { value: "battle", children: "Battle" }), _jsx("option", { value: "choreographic", children: "Choreographic" })] }), newCategoryType === "battle" ? (_jsxs(_Fragment, { children: [_jsxs("select", { value: newBattleFormat, onChange: (event) => setNewBattleFormat(event.target.value), disabled: activeRole !== "organizer", children: [_jsx("option", { value: "TOP_4", children: "Top 4" }), _jsx("option", { value: "TOP_8", children: "Top 8" }), _jsx("option", { value: "TOP_16", children: "Top 16" }), _jsx("option", { value: "TOP_32", children: "Top 32" }), _jsx("option", { value: "CUSTOM", children: "Custom" })] }), newBattleFormat === "CUSTOM" && (_jsx("input", { type: "number", min: 2, value: newBattleCustomSize, onChange: (event) => setNewBattleCustomSize(Number(event.target.value)), disabled: activeRole !== "organizer" }))] })) : (_jsxs(_Fragment, { children: [_jsx("input", { placeholder: "Themes separated by comma", value: newChoreoThemes, onChange: (event) => setNewChoreoThemes(event.target.value), disabled: activeRole !== "organizer" }), _jsx("input", { type: "number", min: 0, value: newChoreoBattleSize, onChange: (event) => setNewChoreoBattleSize(Number(event.target.value)), disabled: activeRole !== "organizer" })] })), _jsx("button", { type: "button", onClick: createCategory, disabled: activeRole !== "organizer", children: "Add category" })] }), _jsxs("div", { className: "list", children: [categories.length === 0 && _jsx("p", { className: "muted", children: "No categories yet." }), categories.map((category) => (_jsxs("div", { className: "listItem listItemBlock", children: [_jsxs("div", { children: [_jsx("strong", { children: category.name }), _jsxs("p", { className: "muted", children: ["Type: ", category.type] }), category.type === "battle" ? (_jsxs("p", { className: "muted", children: ["Format: ", category.battleFormat, category.battleFormat === "CUSTOM" ? ` (${category.customBattleSize})` : ""] })) : (_jsxs("p", { className: "muted", children: ["Themes: ", (category.choreoThemes ?? []).join(", ")] })), _jsxs("p", { className: "muted", children: ["Run order: ", category.runOrderParticipantIds.join(" > ") || "not started"] })] }), _jsx("button", { type: "button", onClick: () => void startCategory(category.id), disabled: activeRole !== "organizer", children: category.isStarted ? "Re-shuffle" : "Start category" })] }, category.id)))] })] }), _jsxs("article", { className: "card cardWide", children: [_jsx("h2", { children: "Registration: Participants" }), (activeRole === "host" || activeRole === "judge") && (_jsx("p", { className: "muted", children: "Registration editing is reserved to creator/organizer in this slice." })), _jsxs("div", { className: "formRow", children: [_jsx("input", { placeholder: "Participant or crew name", value: newParticipantName, onChange: (event) => setNewParticipantName(event.target.value), disabled: activeRole === "host" || activeRole === "judge" }), _jsx("select", { multiple: true, value: selectedCategoryIds, onChange: (event) => {
-                                            const nextSelection = [...event.target.selectedOptions].map((entry) => entry.value);
-                                            setSelectedCategoryIds(nextSelection);
-                                        }, disabled: activeRole === "host" || activeRole === "judge", children: categories.map((category) => (_jsx("option", { value: category.id, children: category.name }, category.id))) }), _jsx("button", { type: "button", onClick: () => void registerParticipant(), disabled: activeRole === "host" || activeRole === "judge", children: "Register" })] }), _jsx("div", { className: "formRow", children: _jsx("input", { placeholder: "Search participant or category", value: participantSearch, onChange: (event) => setParticipantSearch(event.target.value) }) }), _jsxs("div", { className: "list", children: [filteredParticipants.length === 0 && _jsx("p", { className: "muted", children: "No participants found." }), filteredParticipants.map((participant) => {
-                                        const isEditing = editingParticipantId === participant.id;
-                                        const attachedStartedCategory = participant.categoryIds.some((categoryId) => categories.find((category) => category.id === categoryId)?.isStarted);
-                                        return (_jsxs("div", { className: "listItem listItemBlock", children: [_jsxs("div", { children: [isEditing ? (_jsx("input", { value: participant.displayName, onChange: (event) => updateParticipant(participant.id, { displayName: event.target.value }) })) : (_jsx("strong", { children: participant.displayName })), _jsxs("p", { className: "muted", children: ["Categories: ", participant.categoryIds.map((id) => categories.find((category) => category.id === id)?.name ?? id).join(", ")] }), attachedStartedCategory && (_jsx("p", { className: "warning", children: "This participant is in a started category, removal is blocked by design." }))] }), _jsxs("div", { className: "actionsInline", children: [_jsx("button", { type: "button", onClick: () => setEditingParticipantId(isEditing ? null : participant.id), children: isEditing ? "Done" : "Edit" }), _jsx("button", { type: "button", disabled: attachedStartedCategory, children: "Remove" })] })] }, participant.id));
-                                    })] })] })] }), _jsxs("section", { className: "panel", children: [_jsx("h2", { children: "Preselection Tie Detector Demo" }), _jsxs("p", { children: ["Top-2 tie warning: ", _jsx("strong", { children: tieDemo.tieAtCutoff ? "YES" : "NO" })] }), _jsx("ul", { children: tieDemo.ranking.map((entry, index) => (_jsxs("li", { children: ["#", index + 1, " - ", entry.participantId, ": ", entry.totalScore, " points (", entry.judgeCount, " votes)"] }, entry.participantId))) })] })] }));
+    function runPreselectionSimulation() {
+        if (!simulationCategoryId) {
+            return;
+        }
+        const categoryParticipants = participants.filter((entry) => entry.categoryIds.includes(simulationCategoryId));
+        if (categoryParticipants.length === 0) {
+            return;
+        }
+        const judgeIds = ["judge_1", "judge_2", "judge_3"];
+        const votes = [];
+        for (const participant of categoryParticipants) {
+            for (const judgeId of judgeIds) {
+                votes.push({
+                    judgeId,
+                    participantId: participant.id,
+                    score: Math.floor(Math.random() * 11)
+                });
+            }
+        }
+        const nextSimulation = {
+            categoryId: simulationCategoryId,
+            cutoff: simulationCutoff,
+            votes
+        };
+        setSimulation(nextSimulation);
+        saveAll({ simulation: nextSimulation });
+    }
+    function renderLogin() {
+        return (_jsxs("main", { className: "layout", children: [_jsxs("header", { className: "hero", children: [_jsx("p", { className: "kicker", children: "Eventiny Local Simulation" }), _jsx("h1", { children: "Login" }), _jsx("p", { children: "This local mode uses in-browser data only, so you can test full flows before Firebase deployment." })] }), _jsxs("section", { className: "card cardWide authCard", children: [_jsxs("div", { className: "tabRow", children: [_jsx("button", { type: "button", className: loginMode === "creator" ? "tabButton tabButtonActive" : "tabButton", onClick: () => setLoginMode("creator"), children: "Creator login" }), _jsx("button", { type: "button", className: loginMode === "organizer" ? "tabButton tabButtonActive" : "tabButton", onClick: () => setLoginMode("organizer"), children: "Organizer login" })] }), loginMode === "creator" && (_jsx("p", { className: "muted", children: "Dev credentials: creator / creator123" })), _jsxs("div", { className: "formCol", children: [_jsx("input", { placeholder: "Username", value: loginUsername, onChange: (event) => setLoginUsername(event.target.value) }), _jsx("input", { placeholder: "Password", type: "password", value: loginPassword, onChange: (event) => setLoginPassword(event.target.value) }), _jsx("button", { type: "button", onClick: login, children: "Login" }), loginError && _jsx("p", { className: "errorText", children: loginError })] })] })] }));
+    }
+    function renderCreatorDashboard() {
+        return (_jsxs("main", { className: "layout", children: [_jsxs("header", { className: "hero headerSplit", children: [_jsxs("div", { children: [_jsx("p", { className: "kicker", children: "Creator Dashboard" }), _jsx("h1", { children: "Manage organizer credentials" }), _jsx("p", { children: "Creator pages are separated from organizer pages. Organizers cannot access this area." })] }), _jsx("button", { type: "button", onClick: logout, children: "Logout" })] }), _jsxs("section", { className: "grid", children: [_jsxs("article", { className: "card cardWide", children: [_jsx("h2", { children: "Create organizer access" }), _jsxs("div", { className: "formRow", children: [_jsx("input", { placeholder: "Organizer name", value: newOrganizerName, onChange: (event) => setNewOrganizerName(event.target.value) }), _jsx("input", { placeholder: "Event id", value: newOrganizerEventId, onChange: (event) => setNewOrganizerEventId(event.target.value) }), _jsx("input", { type: "number", min: 1, value: newOrganizerExpiryDays, onChange: (event) => setNewOrganizerExpiryDays(Number(event.target.value)) }), _jsx("button", { type: "button", onClick: createOrganizerAccess, children: "Create" })] })] }), _jsxs("article", { className: "card cardWide", children: [_jsx("h2", { children: "Organizer credentials (share these)" }), _jsxs("div", { className: "list", children: [organizerCredentials.length === 0 && _jsx("p", { className: "muted", children: "No organizer credentials created yet." }), organizerCredentials.map((entry) => {
+                                            const status = entry.revokedAtIso ? "revoked" : new Date(entry.expiresAtIso).getTime() <= Date.now() ? "expired" : "active";
+                                            return (_jsxs("div", { className: "listItem listItemBlock", children: [_jsxs("div", { children: [_jsx("strong", { children: entry.organizerName }), _jsxs("p", { className: "muted", children: ["Event: ", entry.eventId] }), _jsxs("p", { className: "mono", children: ["username: ", entry.username] }), _jsxs("p", { className: "mono", children: ["password: ", entry.password] }), _jsxs("p", { className: "muted", children: ["Expires: ", new Date(entry.expiresAtIso).toLocaleString()] }), _jsxs("p", { className: "muted", children: ["Status: ", status] })] }), _jsx("button", { type: "button", onClick: () => revokeOrganizerAccess(entry.id), disabled: status !== "active", children: "Revoke" })] }, entry.id));
+                                        })] })] })] })] }));
+    }
+    function renderOrganizerDashboard() {
+        if (!currentOrganizer) {
+            return renderLogin();
+        }
+        return (_jsxs("main", { className: "layout", children: [_jsxs("header", { className: "hero headerSplit", children: [_jsxs("div", { children: [_jsx("p", { className: "kicker", children: "Organizer Dashboard" }), _jsx("h1", { children: currentOrganizer.organizerName }), _jsxs("p", { children: ["Event: ", currentOrganizer.eventId] })] }), _jsx("button", { type: "button", onClick: logout, children: "Logout" })] }), _jsxs("section", { className: "grid", children: [_jsxs("article", { className: "card cardWide", children: [_jsx("h2", { children: "Categories" }), _jsxs("div", { className: "formRow", children: [_jsx("input", { placeholder: "Category name", value: newCategoryName, onChange: (event) => setNewCategoryName(event.target.value) }), _jsxs("select", { value: newCategoryType, onChange: (event) => setNewCategoryType(event.target.value), children: [_jsx("option", { value: "battle", children: "Battle" }), _jsx("option", { value: "choreographic", children: "Choreographic" })] }), newCategoryType === "battle" ? (_jsxs(_Fragment, { children: [_jsxs("select", { value: newBattleFormat, onChange: (event) => setNewBattleFormat(event.target.value), children: [_jsx("option", { value: "TOP_4", children: "Top 4" }), _jsx("option", { value: "TOP_8", children: "Top 8" }), _jsx("option", { value: "TOP_16", children: "Top 16" }), _jsx("option", { value: "TOP_32", children: "Top 32" }), _jsx("option", { value: "CUSTOM", children: "Custom" })] }), newBattleFormat === "CUSTOM" && (_jsx("input", { type: "number", min: 2, value: newBattleCustomSize, onChange: (event) => setNewBattleCustomSize(Number(event.target.value)) }))] })) : (_jsxs(_Fragment, { children: [_jsx("input", { placeholder: "Themes (comma separated)", value: newChoreoThemes, onChange: (event) => setNewChoreoThemes(event.target.value) }), _jsx("input", { type: "number", min: 0, value: newChoreoBattleSize, onChange: (event) => setNewChoreoBattleSize(Number(event.target.value)) })] })), _jsx("button", { type: "button", onClick: createCategory, children: "Add category" })] }), _jsxs("div", { className: "list", children: [organizerCategories.length === 0 && _jsx("p", { className: "muted", children: "No categories yet." }), organizerCategories.map((category) => (_jsxs("div", { className: "listItem listItemBlock", children: [_jsxs("div", { children: [_jsx("strong", { children: categoryLabel(category) }), _jsxs("p", { className: "muted", children: ["Run order: ", category.runOrderParticipantIds.join(" > ") || "not started"] })] }), _jsx("button", { type: "button", onClick: () => void startCategory(category.id), children: category.isStarted ? "Re-shuffle" : "Start category" })] }, category.id)))] })] }), _jsxs("article", { className: "card cardWide", children: [_jsx("h2", { children: "Participants" }), _jsxs("div", { className: "formRow", children: [_jsx("input", { placeholder: "Participant / crew name", value: newParticipantName, onChange: (event) => setNewParticipantName(event.target.value) }), _jsx("select", { multiple: true, value: selectedCategoryIds, onChange: (event) => {
+                                                const next = [...event.target.selectedOptions].map((entry) => entry.value);
+                                                setSelectedCategoryIds(next);
+                                            }, children: organizerCategories.map((category) => (_jsx("option", { value: category.id, children: categoryLabel(category) }, category.id))) }), _jsx("button", { type: "button", onClick: () => void registerParticipant(), children: "Register" })] }), _jsx("div", { className: "formRow", children: _jsx("input", { placeholder: "Search by participant or category", value: participantSearch, onChange: (event) => setParticipantSearch(event.target.value) }) }), _jsxs("div", { className: "list", children: [filteredParticipants.length === 0 && _jsx("p", { className: "muted", children: "No participants for this event." }), filteredParticipants.map((participant) => {
+                                            const isEditing = editingParticipantId === participant.id;
+                                            const started = participant.categoryIds.some((categoryId) => categories.find((entry) => entry.id === categoryId)?.isStarted);
+                                            return (_jsxs("div", { className: "listItem listItemBlock", children: [_jsxs("div", { children: [isEditing ? (_jsx("input", { value: participant.displayName, onChange: (event) => updateParticipant(participant.id, { displayName: event.target.value }) })) : (_jsx("strong", { children: participant.displayName })), _jsxs("p", { className: "muted", children: ["Categories: ", participant.categoryIds.map((id) => organizerCategories.find((entry) => entry.id === id)?.name ?? id).join(", ")] }), started && _jsx("p", { className: "warning", children: "Removal blocked: at least one category already started." })] }), _jsxs("div", { className: "actionsInline", children: [_jsx("button", { type: "button", onClick: () => setEditingParticipantId(isEditing ? null : participant.id), children: isEditing ? "Done" : "Edit" }), _jsx("button", { type: "button", onClick: () => removeParticipant(participant.id), disabled: started, children: "Remove" })] })] }, participant.id));
+                                        })] })] }), _jsxs("article", { className: "card cardWide", children: [_jsx("h2", { children: "Preselection simulation" }), _jsx("p", { className: "muted", children: "This simulates judge votes for one category to test ranking and tie-at-cutoff behavior before running a real event." }), _jsxs("div", { className: "formRow", children: [_jsxs("select", { value: simulationCategoryId, onChange: (event) => setSimulationCategoryId(event.target.value), children: [_jsx("option", { value: "", children: "Select category" }), organizerCategories.map((category) => (_jsx("option", { value: category.id, children: categoryLabel(category) }, category.id)))] }), _jsx("input", { type: "number", min: 1, value: simulationCutoff, onChange: (event) => setSimulationCutoff(Number(event.target.value)) }), _jsx("button", { type: "button", onClick: runPreselectionSimulation, children: "Simulate votes" })] }), !rankingView && _jsx("p", { className: "muted", children: "No simulation yet." }), rankingView && simulation && (_jsxs("div", { children: [_jsxs("p", { children: ["Tie at cutoff ", _jsx("strong", { children: simulation.cutoff }), ": ", _jsx("strong", { children: rankingView.tieAtCutoff ? "YES" : "NO" })] }), _jsx("ul", { children: rankingView.ranking.map((entry, index) => (_jsxs("li", { children: ["#", index + 1, " ", participants.find((item) => item.id === entry.participantId)?.displayName ?? entry.participantId, " - ", entry.totalScore] }, entry.participantId))) })] }))] })] })] }));
+    }
+    if (!session) {
+        return renderLogin();
+    }
+    if (session.role === "creator") {
+        return renderCreatorDashboard();
+    }
+    return renderOrganizerDashboard();
 }
 //# sourceMappingURL=App.js.map

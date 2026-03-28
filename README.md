@@ -8,7 +8,9 @@ Firebase-first implementation scaffold for a dance battle management platform.
 - Shared domain package for battle lifecycle and ranking tie detection.
 - Application layer with use cases for organizer access validation and category start flow.
 - Firebase adapter package implementing repositories against Firestore.
-- Web app scaffold with responsive foundation and a domain-logic demo screen.
+- Local simulation app with separate login pages and isolated dashboards for creator and organizer.
+- Creator flow to generate temporary organizer credentials and revoke them.
+- Organizer flow to manage categories, registrations, run order start, and preselection simulation.
 - Documentation for free-tier operation and next implementation slices.
 
 ## Workspace structure
@@ -35,19 +37,37 @@ docs                        # Architecture and rollout docs
 npm install
 ```
 
-2. Copy environment template:
-
-```bash
-cp apps/web/.env.example apps/web/.env
-```
-
-3. Fill Firebase values in `apps/web/.env`.
-
-4. Run the app:
+2. Run the app:
 
 ```bash
 npm run dev
 ```
+
+3. Open the local URL shown by Vite.
+
+4. Login as creator (local-dev credentials):
+
+```bash
+username: creator
+password: creator123
+```
+
+5. In creator dashboard, create organizer access and note generated username/password.
+
+6. Logout and login as organizer using generated credentials.
+
+7. Run a local event simulation:
+- create categories
+- register participants
+- start category (random run order)
+- run preselection simulation and inspect tie-at-cutoff result
+
+## Notes on local mode
+
+- Local simulation persists in browser local storage.
+- Creator and organizer dashboards are separated by login session.
+- Organizer cannot access creator dashboard unless creator credentials are used.
+- Firebase environment values are not required for local simulation at this stage.
 
 ## Free-tier guardrails
 
