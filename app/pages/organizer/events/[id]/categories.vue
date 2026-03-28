@@ -9,7 +9,7 @@
       <div class="flex items-center justify-between">
         <p class="text-sm text-gray-400">
           Categories define the different competitions in your event. Each category can be a
-          <strong>Battle</strong> (1v1 elimination) or <strong>Choreographic</strong> (scored performance by crews/soloists).
+          <strong>Versus</strong> (elimination bracket) or <strong>Choreographic</strong> (scored performance by crews/soloists).
         </p>
         <UButton icon="i-lucide-plus" @click="openCreate" class="cursor-pointer shrink-0 ml-4">
           New Category
@@ -29,11 +29,9 @@
             <div>
               <div class="flex items-center gap-2 flex-wrap">
                 <span class="font-medium text-lg">{{ cat.name }}</span>
-                <UBadge :color="cat.type === 'battle' ? 'error' : 'info'" variant="subtle">
-                  {{ cat.type === 'battle' ? 'Battle' : 'Choreographic' }}
-                </UBadge>
-                <UBadge :color="phaseColor(cat.categoryState?.phase)" variant="subtle">
-                  {{ cat.categoryState?.phase || 'idle' }}
+                <span class="text-xs text-gray-500 uppercase tracking-wide">{{ cat.type === 'battle' ? 'Versus' : 'Choreographic' }}</span>
+                <UBadge v-if="cat.categoryState?.phase && cat.categoryState.phase !== 'idle'" :color="phaseColor(cat.categoryState.phase)" variant="outline">
+                  {{ cat.categoryState.phase }}
                 </UBadge>
               </div>
 
@@ -46,7 +44,7 @@
               <!-- Choreo details -->
               <div v-if="cat.type === 'choreo'" class="text-sm text-gray-400 mt-1">
                 <span v-if="cat.choreoThemes?.length">Themes: {{ cat.choreoThemes.map((t: any) => t.name).join(', ') }}</span>
-                <span v-if="cat.choreoBattleTop" class="ml-3">→ Battle top {{ cat.choreoBattleTop }}</span>
+                <span v-if="cat.choreoBattleTop" class="ml-3">→ Versus top {{ cat.choreoBattleTop }}</span>
               </div>
 
               <div class="text-xs text-gray-500 mt-1">
@@ -83,17 +81,17 @@
               <UInput v-model="form.name" placeholder="Category name" class="w-full" />
             </UFormField>
 
-            <UFormField v-if="!editing" label="Type" help="Battle = 1v1 elimination bracket after preselections. Choreographic = crews/soloists scored on multiple themes.">
+            <UFormField v-if="!editing" label="Type" help="Versus = elimination bracket after preselections. Choreographic = crews/soloists scored on multiple themes.">
               <USelect v-model="form.type" :items="typeOptions" class="w-full" />
             </UFormField>
 
-            <!-- Battle settings -->
+            <!-- Versus settings -->
             <template v-if="form.type === 'battle'">
-              <UFormField label="Bracket Size" help="How many dancers advance from preselections to the battle bracket. If more participants register, the rest are eliminated in preselections.">
+              <UFormField label="Bracket Size" help="How many dancers advance from preselections to the versus bracket. If more participants register, the rest are eliminated in preselections.">
                 <USelect v-model="form.bracketSize" :items="bracketSizeOptions" class="w-full" />
               </UFormField>
 
-              <UFormField label="Battle Voting Mode" help="Hands = judges raise hands, host marks the winner manually. App = each judge selects the winner on their device, the app computes the result (supports weighted votes).">
+              <UFormField label="Versus Voting Mode" help="Hands = judges raise hands, host marks the winner manually. App = each judge selects the winner on their device, the app computes the result (supports weighted votes).">
                 <USelect v-model="form.battleVotingMode" :items="votingModeOptions" class="w-full" />
               </UFormField>
             </template>
@@ -112,7 +110,7 @@
                 </div>
               </UFormField>
 
-              <UFormField label="Battle Phase (optional)" help="After scoring, optionally have the top N crews battle in an elimination bracket. Leave empty for ranking-only.">
+              <UFormField label="Versus Phase (optional)" help="After scoring, optionally have the top N crews compete in an elimination bracket. Leave empty for ranking-only.">
                 <UInput v-model.number="form.choreoBattleTop" type="number" placeholder="e.g. 4" class="w-full" />
               </UFormField>
             </template>
@@ -167,7 +165,7 @@ const form = reactive({
 })
 
 const typeOptions = [
-  { label: 'Battle (1v1 elimination)', value: 'battle' },
+  { label: 'Versus (elimination bracket)', value: 'battle' },
   { label: 'Choreographic (scored themes)', value: 'choreo' },
 ]
 

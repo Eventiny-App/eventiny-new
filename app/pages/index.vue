@@ -3,7 +3,7 @@
     <div class="w-full max-w-md">
       <div class="text-center mb-8">
         <h1 class="text-4xl font-bold text-white">Eventiny</h1>
-        <p class="text-gray-400 mt-2">Dance Battle Event Manager</p>
+        <p class="text-gray-400 mt-2">Dance Event Manager</p>
       </div>
 
       <UCard>

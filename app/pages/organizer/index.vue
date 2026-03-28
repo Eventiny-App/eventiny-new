@@ -18,7 +18,7 @@
         <div>
           <h2 class="text-2xl font-semibold">Your Events</h2>
           <p class="text-sm text-gray-400 mt-1">
-            Create and manage your dance battle events. Each event can have multiple categories,
+            Create and manage your dance events. Each event can have multiple categories,
             judges, hosts, and participants.
           </p>
         </div>
@@ -32,7 +32,7 @@
         <div class="text-center py-8 space-y-2">
           <UIcon name="i-lucide-calendar-plus" class="text-4xl text-gray-600" />
           <p class="text-gray-400">You don't have any events yet.</p>
-          <p class="text-sm text-gray-500">Click "New Event" to create your first dance battle event.</p>
+          <p class="text-sm text-gray-500">Click "New Event" to create your first dance event.</p>
         </div>
       </UCard>
 
@@ -76,7 +76,7 @@
           </template>
           <UForm :state="createForm" class="space-y-4" @submit="handleCreate">
             <UFormField label="Event Name" name="name" help="A short, descriptive name for the event (e.g., 'Street Battle Roma 2026').">
-              <UInput v-model="createForm.name" placeholder="My Dance Battle" class="w-full" />
+              <UInput v-model="createForm.name" placeholder="My Dance Event" class="w-full" />
             </UFormField>
             <UFormField label="Start Date" name="startDate" help="When the event begins (participants can register before this date).">
               <UInput v-model="createForm.startDate" type="date" class="w-full" />

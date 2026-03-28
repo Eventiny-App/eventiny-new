@@ -84,13 +84,11 @@ const route = useRoute()
 const categoryId = route.params.categoryId as string
 
 const { user, fetchMe, isHost, isOrganizer, isAdmin } = useAuth()
-
-onMounted(async () => {
-  await fetchMe()
-})
+const authState = useAuth().state
 
 const eventId = computed(() => {
-  // Host gets eventId from auth, organizer gets from route query
+  // Host gets eventId from auth state, organizer gets from user or route query
+  if (authState.value?.eventId) return authState.value.eventId
   if (user.value?.eventId) return user.value.eventId
   return (route.query.eventId as string) || ''
 })
@@ -108,7 +106,10 @@ async function loadRanking() {
   }
 }
 
-onMounted(() => loadRanking())
+onMounted(async () => {
+  await fetchMe()
+  await loadRanking()
+})
 
 const columnCount = computed(() => {
   let cols = 3 // rank, name, average

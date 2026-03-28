@@ -14,16 +14,15 @@
   },
   "dependencies": {
     "@nuxt/ui": "^3",
-    "@pinia/nuxt": "^0.9",
     "@prisma/client": "^6",
     "@vite-pwa/nuxt": "^0.10",
     "bcryptjs": "^2.4.3",
     "jsonwebtoken": "^9.0.2",
     "nuxt": "^3.17",
-    "pinia": "^2.3",
     "zod": "^3.24"
   },
   "devDependencies": {
+    "@iconify-json/lucide": "^1.2.100",
     "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.9",
     "prisma": "^6",

@@ -20,7 +20,7 @@
         </div>
 
         <p v-if="ranking.bracketSize" class="text-sm text-gray-400">
-          Top <strong>{{ ranking.bracketSize }}</strong> advance to battles.
+          Top <strong>{{ ranking.bracketSize }}</strong> advance to versus rounds.
         </p>
 
         <UCard>

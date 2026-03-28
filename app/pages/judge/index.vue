@@ -25,7 +25,7 @@
             <div class="flex items-center justify-between">
               <div>
                 <span class="font-medium">{{ cat.name }}</span>
-                <UBadge :color="cat.type === 'battle' ? 'error' : 'info'" variant="subtle" class="ml-2">{{ cat.type }}</UBadge>
+                <span class="text-xs text-gray-500 ml-2">{{ cat.type === 'battle' ? 'versus' : 'choreo' }}</span>
               </div>
               <UBadge :color="phaseColor(cat.categoryState?.phase)" variant="outline">
                 {{ cat.categoryState?.phase || 'idle' }}
@@ -54,28 +54,32 @@
 
         <!-- PRESELECTION voting -->
         <div v-else-if="catState?.phase === 'preselection'" class="space-y-4">
-          <!-- Current performer -->
-          <UCard>
-            <template #header>
-              <div class="flex items-center justify-between">
-                <h3 class="font-semibold">Now Performing</h3>
-                <span class="text-xs text-gray-500">
-                  {{ currentIndex + 1 }} / {{ catState.totalParticipants }}
-                </span>
-              </div>
-            </template>
-            <div class="text-center py-4">
-              <p class="text-3xl font-bold text-green-400">{{ currentParticipantName }}</p>
-            </div>
-          </UCard>
+          <!-- Host indicator -->
+          <div v-if="catState.currentParticipantId" class="bg-yellow-900/20 border border-yellow-700 rounded p-2 flex items-center justify-between">
+            <p class="text-xs text-yellow-400">
+              <span class="font-medium">Host is on:</span> {{ hostCurrentName }}
+              ({{ hostCurrentIndex + 1 }}/{{ catState.totalParticipants }})
+            </p>
+            <UButton
+              v-if="judgeSelectedParticipantId !== catState.currentParticipantId"
+              size="xs"
+              variant="ghost"
+              @click="judgeSelectedParticipantId = catState.currentParticipantId"
+              class="cursor-pointer text-yellow-400"
+            >
+              Jump there
+            </UButton>
+          </div>
 
-          <!-- Score input -->
-          <UCard v-if="catState.currentParticipantId">
+          <!-- Score input for selected participant -->
+          <UCard v-if="judgeSelectedParticipantId">
             <template #header>
               <h3 class="font-semibold">
                 {{ catState.type === 'choreo' ? 'Score by Theme' : 'Your Score' }}
               </h3>
             </template>
+
+            <p class="text-center text-2xl font-bold text-green-400 mb-4">{{ judgeSelectedName }}</p>
 
             <!-- Battle preselection: single score -->
             <div v-if="catState.type !== 'choreo' || catState.themes.length === 0" class="space-y-4">
@@ -103,10 +107,10 @@
                 @click="submitPreselectionVote"
                 class="cursor-pointer"
               >
-                {{ myVotes[catState.currentParticipantId] !== undefined ? 'Update Score' : 'Submit Score' }}
+                {{ myVotes[judgeSelectedParticipantId] !== undefined ? 'Update Score' : 'Submit Score' }}
               </UButton>
-              <p v-if="myVotes[catState.currentParticipantId] !== undefined" class="text-xs text-green-400 text-center">
-                You scored {{ myVotes[catState.currentParticipantId] }}
+              <p v-if="myVotes[judgeSelectedParticipantId] !== undefined" class="text-xs text-green-400 text-center">
+                You scored {{ myVotes[judgeSelectedParticipantId] }}
               </p>
             </div>
 
@@ -144,24 +148,53 @@
             </div>
           </UCard>
 
-          <!-- Vote history for this category -->
+          <!-- Participant selector -->
           <UCard>
-            <template #header><h3 class="font-semibold text-sm">Your Votes So Far</h3></template>
-            <div class="space-y-1 max-h-60 overflow-y-auto">
-              <div
+            <template #header>
+              <div class="flex items-center justify-between">
+                <h3 class="font-semibold text-sm">Select Participant</h3>
+                <div class="flex gap-1">
+                  <UButton
+                    size="xs"
+                    variant="outline"
+                    icon="i-lucide-chevron-left"
+                    :disabled="judgeSelectedIndex <= 0"
+                    @click="judgeSelectedParticipantId = catState.participants[judgeSelectedIndex - 1]?.id"
+                    class="cursor-pointer"
+                  />
+                  <UButton
+                    size="xs"
+                    variant="outline"
+                    icon="i-lucide-chevron-right"
+                    :disabled="judgeSelectedIndex >= catState.participants.length - 1"
+                    @click="judgeSelectedParticipantId = catState.participants[judgeSelectedIndex + 1]?.id"
+                    class="cursor-pointer"
+                  />
+                </div>
+              </div>
+            </template>
+            <div class="space-y-1 max-h-48 overflow-y-auto">
+              <button
                 v-for="p in catState.participants"
                 :key="p.id"
-                class="flex items-center justify-between py-1 px-2 rounded text-sm"
-                :class="p.id === catState.currentParticipantId ? 'bg-green-900/30 border border-green-700' : ''"
+                class="w-full flex items-center justify-between py-1.5 px-2 rounded text-sm transition-colors cursor-pointer"
+                :class="[
+                  p.id === judgeSelectedParticipantId ? 'bg-green-900/40 border border-green-600' : 'hover:bg-gray-800',
+                  p.id === catState.currentParticipantId && p.id !== judgeSelectedParticipantId ? 'border border-yellow-700/50' : '',
+                ]"
+                @click="judgeSelectedParticipantId = p.id"
               >
-                <span :class="p.id === catState.currentParticipantId ? 'text-green-400 font-medium' : 'text-gray-300'">
-                  {{ p.orderPosition }}. {{ p.name }}
+                <span class="flex items-center gap-2">
+                  <span v-if="p.id === catState.currentParticipantId" class="text-yellow-400 text-xs" title="Host is here">●</span>
+                  <span :class="p.id === judgeSelectedParticipantId ? 'text-green-400 font-medium' : 'text-gray-300'">
+                    {{ p.orderPosition }}. {{ p.name }}
+                  </span>
                 </span>
                 <span v-if="getMyScoreForParticipant(p.id) !== null" class="text-green-400 font-mono text-xs">
                   {{ getMyScoreForParticipant(p.id) }}
                 </span>
                 <span v-else class="text-gray-600 text-xs">—</span>
-              </div>
+              </button>
             </div>
           </UCard>
         </div>
@@ -245,6 +278,7 @@ const { state: authState, logout, fetchMe, isJudge } = useAuth()
 onMounted(async () => {
   await fetchMe()
   if (!isJudge.value) navigateTo('/')
+  await loadCategories()
 })
 
 const eventId = computed(() => authState.value?.eventId || '')
@@ -257,8 +291,6 @@ async function loadCategories() {
   if (!eventId.value) return
   allCategories.value = (await $fetch(`/api/events/${eventId.value}/categories`)) as any[]
 }
-
-onMounted(() => loadCategories())
 
 // Category state polling
 const selectedCategoryId = ref<string | null>(null)
@@ -320,12 +352,42 @@ const currentParticipantName = computed(() => {
   return catState.value.participants[currentIndex.value]?.name || '—'
 })
 
+// Judge's own participant selection (independent from host)
+const judgeSelectedParticipantId = ref<string | null>(null)
+
+const judgeSelectedIndex = computed(() => {
+  if (!catState.value?.participants || !judgeSelectedParticipantId.value) return 0
+  return catState.value.participants.findIndex((p: any) => p.id === judgeSelectedParticipantId.value)
+})
+
+const judgeSelectedName = computed(() => {
+  if (!catState.value?.participants || judgeSelectedIndex.value < 0) return '—'
+  return catState.value.participants[judgeSelectedIndex.value]?.name || '—'
+})
+
+const hostCurrentIndex = computed(() => {
+  if (!catState.value?.participants || !catState.value?.currentParticipantId) return 0
+  return catState.value.participants.findIndex((p: any) => p.id === catState.value.currentParticipantId)
+})
+
+const hostCurrentName = computed(() => {
+  if (!catState.value?.participants || hostCurrentIndex.value < 0) return '—'
+  return catState.value.participants[hostCurrentIndex.value]?.name || '—'
+})
+
+// Initialize judge selection to first participant when entering preselection
+watch(() => catState.value?.phase, (phase) => {
+  if (phase === 'preselection' && catState.value?.participants?.length && !judgeSelectedParticipantId.value) {
+    judgeSelectedParticipantId.value = catState.value.participants[0]?.id
+  }
+})
+
 // Preselection score
 const currentScore = ref<number | null>(null)
 const themeScores = reactive<Record<string, number>>({})
 
-// When current participant changes, load existing vote
-watch(() => catState.value?.currentParticipantId, (pid) => {
+// When judge-selected participant changes, load existing vote
+watch(judgeSelectedParticipantId, (pid) => {
   if (!pid) return
   if (catState.value?.type !== 'choreo' || catState.value?.themes?.length === 0) {
     // Preselection
@@ -341,7 +403,7 @@ watch(() => catState.value?.currentParticipantId, (pid) => {
 })
 
 const hasChoreoVote = computed(() => {
-  const pid = catState.value?.currentParticipantId
+  const pid = judgeSelectedParticipantId.value
   if (!pid) return false
   return !!(myChoreoVotes.value[pid] && myChoreoVotes.value[pid].length > 0)
 })
@@ -361,18 +423,26 @@ function getMyScoreForParticipant(participantId: string): string | null {
 // Submit votes
 const submitting = ref(false)
 
+function advanceToNext() {
+  const participants = catState.value?.participants
+  if (!participants || judgeSelectedIndex.value >= participants.length - 1) return
+  judgeSelectedParticipantId.value = participants[judgeSelectedIndex.value + 1]?.id
+}
+
 async function submitPreselectionVote() {
-  if (currentScore.value === null || !catState.value?.currentParticipantId) return
+  if (currentScore.value === null || !judgeSelectedParticipantId.value) return
   submitting.value = true
   try {
     await $fetch(`/api/events/${eventId.value}/categories/${selectedCategoryId.value}/votes/preselection`, {
       method: 'POST',
       body: {
-        participantId: catState.value.currentParticipantId,
+        participantId: judgeSelectedParticipantId.value,
         score: currentScore.value,
       },
     })
-    myVotes.value[catState.value.currentParticipantId] = currentScore.value
+    myVotes.value[judgeSelectedParticipantId.value] = currentScore.value
+    // Auto-advance to next participant
+    advanceToNext()
   } catch (e: any) {
     alert(e?.data?.statusMessage || 'Failed to submit vote')
   } finally {
@@ -381,7 +451,7 @@ async function submitPreselectionVote() {
 }
 
 async function submitChoreoVote() {
-  if (!catState.value?.currentParticipantId) return
+  if (!judgeSelectedParticipantId.value) return
   submitting.value = true
   try {
     const scores = (catState.value.themes || []).map((t: any) => ({
@@ -391,11 +461,13 @@ async function submitChoreoVote() {
     await $fetch(`/api/events/${eventId.value}/categories/${selectedCategoryId.value}/votes/choreo`, {
       method: 'POST',
       body: {
-        participantId: catState.value.currentParticipantId,
+        participantId: judgeSelectedParticipantId.value,
         scores,
       },
     })
-    myChoreoVotes.value[catState.value.currentParticipantId] = scores
+    myChoreoVotes.value[judgeSelectedParticipantId.value] = scores
+    // Auto-advance to next participant
+    advanceToNext()
   } catch (e: any) {
     alert(e?.data?.statusMessage || 'Failed to submit vote')
   } finally {

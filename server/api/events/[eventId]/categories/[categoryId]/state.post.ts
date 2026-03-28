@@ -8,6 +8,9 @@ const schema = z.object({
     'start-battles',
     'set-current-matchup',
     'complete',
+    'back-to-ranking',
+    'back-to-preselection',
+    'back-to-battles',
     'reset-to-idle',
   ]),
   participantId: z.string().optional(),
@@ -166,6 +169,75 @@ export default defineEventHandler(async (event) => {
       })
 
       return { success: true, currentMatchupId: matchupId }
+    }
+
+    case 'back-to-ranking': {
+      if (state.phase !== 'battles') {
+        throw createError({ statusCode: 400, statusMessage: 'Can only go back to ranking from battles phase' })
+      }
+
+      // Delete battle bracket data
+      await prisma.battleVote.deleteMany({ where: { matchup: { categoryId } } })
+      await prisma.battleMatchup.deleteMany({ where: { categoryId } })
+
+      await prisma.categoryState.update({
+        where: { id: state.id },
+        data: {
+          phase: 'ranking',
+          currentMatchupId: null,
+        },
+      })
+
+      await prisma.category.update({
+        where: { id: categoryId },
+        data: { status: 'ranking' },
+      })
+
+      return { success: true, phase: 'ranking' }
+    }
+
+    case 'back-to-preselection': {
+      if (state.phase !== 'ranking') {
+        throw createError({ statusCode: 400, statusMessage: 'Can only go back to preselection from ranking phase' })
+      }
+
+      // Restore currentParticipantId to the last participant
+      const lastParticipant = category.participantCategories[category.participantCategories.length - 1]
+
+      await prisma.categoryState.update({
+        where: { id: state.id },
+        data: {
+          phase: 'preselection',
+          currentParticipantId: lastParticipant?.participantId || null,
+        },
+      })
+
+      await prisma.category.update({
+        where: { id: categoryId },
+        data: { status: 'preselection' },
+      })
+
+      return { success: true, phase: 'preselection' }
+    }
+
+    case 'back-to-battles': {
+      if (state.phase !== 'completed') {
+        throw createError({ statusCode: 400, statusMessage: 'Can only go back to battles from completed phase' })
+      }
+
+      await prisma.categoryState.update({
+        where: { id: state.id },
+        data: {
+          phase: 'battles',
+        },
+      })
+
+      await prisma.category.update({
+        where: { id: categoryId },
+        data: { status: 'battles' },
+      })
+
+      return { success: true, phase: 'battles' }
     }
 
     case 'complete': {

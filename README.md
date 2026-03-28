@@ -1,6 +1,6 @@
 # Eventiny
 
-A Progressive Web App for managing dance battle events — from registration through preselections to bracket battles, all from any smartphone, tablet, or laptop.
+A Progressive Web App for managing dance events — from registration through preselections to versus brackets, all from any smartphone, tablet, or laptop.
 
 ---
 
@@ -18,7 +18,7 @@ The admin is the owner of the platform. They:
 An organizer manages one or more events. After logging in with their email/password, they:
 - **Create an event** with a name and date range.
 - **Set up categories** — each category is an independent competition (e.g., "House", "Breaking Top 16", "Hip Hop Crew Choreo"). Categories can be:
-  - **Battle** — 1v1 elimination bracket after preselections.
+  - **Versus** — elimination bracket after preselections.
   - **Choreographic** — crews/soloists scored on multiple themes (e.g., Musicality, Technique, Creativity).
 - **Register participants** (dancers/crews) and assign them to one or more categories.
 - **Create judges** with PINs, assign them to categories with optional weight (e.g., a head judge might count 1.5×).
@@ -32,34 +32,40 @@ The organizer then shares two things with staff:
 The host runs the show from their phone. On the Host Panel they:
 - **Select a category** to run.
 - **Start preselections** — participants are shown one at a time in randomized order.
-- **Navigate** through participants ("Next" / "Previous") while judges score in real-time.
+- **Navigate** through participants ("Next" / "Previous") while judges score independently.
+- Use the built-in **stopwatch** to time each performer.
 - **Finish preselections** — the app computes rankings.
-- **Review ranking** — see scores, detect ties at the bracket cutoff.
-- **Generate the battle bracket** — the app seeds matchups automatically (1 vs 16, 2 vs 15, etc.).
-- **Run battles** — activate each matchup, and either:
+- **Review ranking** — see scores. If there's a tie at the bracket cutoff, manually select which tied dancers advance.
+- **Generate the versus bracket** — the app seeds matchups automatically (1 vs 16, 2 vs 15, etc.).
+- **Run versus rounds** — activate each matchup, and either:
   - **Hands mode**: Judges raise hands, host picks the winner manually.
   - **App mode**: Each judge votes on their device, the app computes the result.
+- **Navigate back** to previous phases at any time (ranking → preselection, battles → ranking).
 - **Complete the category** when the bracket is finished.
 
 ### 4. Judge
 Judges vote from their phone. On the Judge Panel they:
-- See the **current performer** (updated in real-time via polling).
-- **Score 0–10** (with decimals) using a slider for battle preselections.
+- See **all participants** in a scrollable list and can freely navigate between them.
+- A yellow indicator shows which participant the host is currently on, but judges are **not locked** to it.
+- **Score 0–10** (with decimals) using a slider for preselections.
 - **Score per theme** for choreographic categories (one slider per theme).
-- **Vote on battles** (in app mode) by tapping the winner's name.
-- Can update their vote until the host moves on.
+- After submitting a score, the app **auto-advances** to the next participant.
+- **Vote on versus rounds** (in app mode) by tapping the winner's name.
+- Can update any vote at any time by navigating back to that participant.
 
-### The Flow for a Battle Category
+### The Flow for a Versus Category
 
 ```
 IDLE → PRESELECTION → RANKING → BATTLES → COMPLETED
 ```
 
 1. **Idle**: Category exists, participants registered, waiting to start.
-2. **Preselection**: Host walks through each participant. Judges score 0–10. Scores are averaged (respecting judge weights).
-3. **Ranking**: Preselection results are computed. The top N (bracket size) advance. Ties at the cutoff are flagged for the host to resolve manually.
-4. **Battles**: Bracket is generated with standard seeding. Single or double elimination. Host activates one matchup at a time, winner advances automatically.
+2. **Preselection**: Host walks through each participant. Judges score 0–10 independently (they can navigate freely). The host has a stopwatch to time performances.
+3. **Ranking**: Preselection results are computed. The top N (bracket size) advance. If there's a tie at the cutoff, the host manually selects which tied dancers qualify.
+4. **Versus**: Bracket is generated with standard seeding (single elimination). Host activates one matchup at a time, winner advances automatically.
 5. **Completed**: Final results are set.
+
+The host can go back to previous phases at any time (e.g., from ranking back to preselection, or from battles back to ranking).
 
 ### The Flow for a Choreographic Category
 
@@ -67,11 +73,11 @@ IDLE → PRESELECTION → RANKING → BATTLES → COMPLETED
 IDLE → PRESELECTION → RANKING → COMPLETED
 ```
 
-Same as above but without a battle phase. Each crew/soloist is scored on multiple themes. Final ranking is the weighted average across all themes and judges.
+Same as above but without a versus phase. Each crew/soloist is scored on multiple themes. Final ranking is the weighted average across all themes and judges.
 
-### Single vs Double Elimination
+### Single Elimination
 
-**Single elimination** — lose once and you're out.
+Lose once and you're out.
 
 Example with 4 dancers (seeds 1–4):
 ```
@@ -84,33 +90,6 @@ Seed 2 ─┐              │
          ├─ Winner B ─┘
 Seed 3 ─┘
 ```
-
-**Double elimination** — you get a second chance through the losers bracket.
-
-Example with 4 dancers:
-```
-WINNERS BRACKET:
-Round 1:        Finals:
-Seed 1 ─┐
-         ├─ W1 ──┐
-Seed 4 ─┘         │
-                   ├─ Winners Final Champion
-Seed 2 ─┐         │
-         ├─ W2 ──┘
-Seed 3 ─┘
-
-LOSERS BRACKET (second chance):
-Losers of Round 1:      Losers Final:
-L1 (lost to Seed 1) ─┐
-                       ├─ Losers Champion
-L2 (lost to Seed 2) ─┘
-
-GRAND FINAL:
-Winners Champion vs Losers Champion
-(Losers Champion must win twice to take the title)
-```
-
-Double elimination is popular in dance battles because a single bad round shouldn't end someone's run — it gives the stronger dancer a chance to come back.
 
 ---
 
@@ -251,7 +230,7 @@ eventiny-new/
 │       ├── auth.ts           # JWT sign/verify, requireAuth middleware
 │       ├── prisma.ts         # Prisma client singleton
 │       ├── sanitize.ts       # Name validation & Unicode normalization
-│       └── bracket.ts        # Bracket generation (single & double elimination)
+│       └── bracket.ts        # Bracket generation (single elimination)
 ├── prisma/
 │   ├── schema.prisma         # Database schema (16 models)
 │   └── seed.ts               # Superadmin seeder
@@ -297,3 +276,83 @@ rm prisma/dev.db && npx prisma db push && npm run db:seed
 npx prisma generate   # Regenerate the client
 npx prisma db push    # Push schema to database
 ```
+
+---
+
+## Deploying to Production
+
+Eventiny is designed to deploy on **Vercel** (hosting) + **Neon** (PostgreSQL database), both of which have generous free tiers.
+
+### Step 1: Create a PostgreSQL database on Neon
+
+1. Go to [neon.tech](https://neon.tech) and create a free account.
+2. Create a new project (e.g., "eventiny").
+3. Copy the **connection string** — it looks like:
+   ```
+   postgresql://user:password@ep-something.region.aws.neon.tech/neondb?sslmode=require
+   ```
+
+### Step 2: Switch Prisma from SQLite to PostgreSQL
+
+Edit `prisma/schema.prisma` and change the datasource:
+
+```prisma
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+```
+
+Then regenerate the Prisma client:
+```bash
+npx prisma generate
+```
+
+> **Note**: SQLite and PostgreSQL have a few differences. The main one is that SQLite uses `String` for dates while PostgreSQL uses `DateTime`. If you encounter issues, run `npx prisma db push --force-reset` on the Neon database to recreate all tables from scratch.
+
+### Step 3: Push the schema to Neon
+
+Set the `DATABASE_URL` to your Neon connection string temporarily:
+
+```bash
+DATABASE_URL="postgresql://user:password@ep-something.region.aws.neon.tech/neondb?sslmode=require" npx prisma db push
+```
+
+Then seed the superadmin:
+```bash
+DATABASE_URL="postgresql://user:password@ep-something.region.aws.neon.tech/neondb?sslmode=require" npx tsx prisma/seed.ts
+```
+
+### Step 4: Deploy to Vercel
+
+1. Push your code to a **GitHub repository** (can be private).
+2. Go to [vercel.com](https://vercel.com) and sign in with GitHub.
+3. Click **"Import Project"** and select your repository.
+4. Vercel auto-detects Nuxt — the defaults work.
+5. Add **Environment Variables** in the Vercel project settings:
+
+   | Variable | Value |
+   |----------|-------|
+   | `DATABASE_URL` | Your Neon connection string |
+   | `JWT_SECRET` | A long random string (e.g., `openssl rand -hex 32`) |
+   | `SUPERADMIN_EMAIL` | Your admin email |
+   | `SUPERADMIN_PASSWORD` | Your admin password |
+
+6. Click **Deploy**.
+
+### Step 5: Verify
+
+- Visit your Vercel deployment URL (e.g., `https://eventiny.vercel.app`).
+- Log in with your superadmin credentials.
+- Create an organizer, event, categories, etc.
+
+### Custom Domain (optional)
+
+In Vercel → Settings → Domains, you can add a custom domain. Vercel handles SSL automatically.
+
+### Updating
+
+After making changes locally:
+1. Commit and push to GitHub.
+2. Vercel automatically redeploys on every push to `main`.
+3. If you changed the Prisma schema, run `npx prisma db push` against the Neon database (using the production `DATABASE_URL`).

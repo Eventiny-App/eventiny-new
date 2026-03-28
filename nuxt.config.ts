@@ -7,7 +7,6 @@ export default defineNuxtConfig({
 
   modules: [
     '@nuxt/ui',
-    '@pinia/nuxt',
     '@vite-pwa/nuxt',
   ],
 
@@ -28,7 +27,7 @@ export default defineNuxtConfig({
 
   pwa: {
     manifest: {
-      name: 'Eventiny — Dance Battle Manager',
+      name: 'Eventiny — Dance Event Manager',
       short_name: 'Eventiny',
       theme_color: '#1e293b',
       background_color: '#0f172a',
