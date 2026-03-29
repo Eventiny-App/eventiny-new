@@ -51,7 +51,7 @@
       </UCard>
 
       <!-- Quick Actions -->
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <UButton block variant="soft" icon="i-lucide-layers" @click="navigateTo(`/organizer/events/${eventId}/categories`)" class="cursor-pointer">
           Categories
         </UButton>
@@ -63,6 +63,9 @@
         </UButton>
         <UButton block variant="soft" icon="i-lucide-mic" @click="navigateTo(`/organizer/events/${eventId}/hosts`)" class="cursor-pointer">
           Hosts
+        </UButton>
+        <UButton block variant="soft" color="success" icon="i-lucide-download" :loading="exporting" @click="exportResults" class="cursor-pointer">
+          Export
         </UButton>
       </div>
 
@@ -160,5 +163,24 @@ async function handleEditEvent() {
 
 function formatDate(d: string) {
   return new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+}
+
+// Export
+const exporting = ref(false)
+
+async function exportResults() {
+  exporting.value = true
+  try {
+    const csv = await $fetch<string>(`/api/events/${eventId}/export`, { responseType: 'text' })
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${eventData.value?.name || 'event'}-export.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  } finally {
+    exporting.value = false
+  }
 }
 </script>
