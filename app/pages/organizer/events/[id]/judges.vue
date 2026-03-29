@@ -52,58 +52,60 @@
     <!-- Create / Edit Modal -->
     <UModal v-model:open="showModal">
       <template #content>
-        <UCard>
-          <template #header>
+        <div class="flex flex-col max-h-[85dvh]">
+          <div class="px-6 pt-6 pb-3 shrink-0">
             <h3 class="text-lg font-semibold">{{ isEditing ? 'Edit Judge' : 'New Judge' }}</h3>
-          </template>
+          </div>
 
-          <div class="space-y-4">
-            <UFormField label="Judge Name" help="Displayed on the judge's screen to confirm identity and avoid tablet mix-ups.">
-              <UInput v-model="form.name" placeholder="Judge name" class="w-full" />
-            </UFormField>
+          <div class="overflow-y-auto px-6 flex-1">
+            <div class="space-y-4 pb-2">
+              <UFormField label="Judge Name" help="Displayed on the judge's screen to confirm identity and avoid tablet mix-ups.">
+                <UInput v-model="form.name" placeholder="Judge name" class="w-full" />
+              </UFormField>
 
-            <UFormField label="Access PIN" help="The judge enters this PIN to access the event from their device. Must be unique within the event (different from other judges and hosts).">
-              <UInput v-model="form.accessPin" placeholder="e.g. 1234" class="w-full" />
-            </UFormField>
+              <UFormField label="Access PIN" help="The judge enters this PIN to access the event from their device. Must be unique within the event (different from other judges and hosts).">
+                <UInput v-model="form.accessPin" placeholder="e.g. 1234" class="w-full" />
+              </UFormField>
 
-            <UFormField label="Assigned Categories" help="Select which categories this judge will score. A judge only sees categories they are assigned to.">
-              <div class="space-y-2">
-                <div v-for="cat in categories" :key="cat.id" class="flex items-center gap-3">
-                  <UCheckbox
-                    :model-value="form.selectedCategoryIds.includes(cat.id)"
-                    @update:model-value="(v: boolean) => toggleCategory(cat.id, v)"
-                  />
-                  <span class="text-sm">{{ cat.name }}</span>
-                  <UBadge :color="cat.type === 'battle' ? 'error' : 'info'" variant="subtle" size="xs">{{ cat.type }}</UBadge>
-
-                  <!-- Weight input (only if category uses app voting) -->
-                  <template v-if="form.selectedCategoryIds.includes(cat.id) && cat.battleVotingMode === 'app'">
-                    <UInput
-                      v-model.number="form.weights[cat.id]"
-                      type="number"
-                      step="0.1"
-                      min="0.1"
-                      max="10"
-                      class="w-20"
-                      placeholder="1.0"
+              <UFormField label="Assigned Categories" help="Select which categories this judge will score. A judge only sees categories they are assigned to.">
+                <div class="space-y-2">
+                  <div v-for="cat in categories" :key="cat.id" class="flex items-center gap-3">
+                    <UCheckbox
+                      :model-value="form.selectedCategoryIds.includes(cat.id)"
+                      @update:model-value="(v: boolean) => toggleCategory(cat.id, v)"
                     />
-                    <span class="text-xs text-gray-500">weight</span>
-                  </template>
-                </div>
-                <p v-if="categories.length === 0" class="text-xs text-gray-500">No categories created yet. Create categories first.</p>
-              </div>
-            </UFormField>
+                    <span class="text-sm">{{ cat.name }}</span>
+                    <UBadge :color="cat.type === 'battle' ? 'error' : 'info'" variant="subtle" size="xs">{{ cat.type }}</UBadge>
 
-            <div class="flex gap-2 justify-end">
-              <UButton variant="ghost" @click="showModal = false" class="cursor-pointer">Cancel</UButton>
-              <UButton :loading="saving" @click="handleSave" class="cursor-pointer">
-                {{ isEditing ? 'Save Changes' : 'Create Judge' }}
-              </UButton>
+                    <!-- Weight input (only if category uses app voting) -->
+                    <template v-if="form.selectedCategoryIds.includes(cat.id) && cat.battleVotingMode === 'app'">
+                      <UInput
+                        v-model.number="form.weights[cat.id]"
+                        type="number"
+                        step="0.1"
+                        min="0.1"
+                        max="10"
+                        class="w-20"
+                        placeholder="1.0"
+                      />
+                      <span class="text-xs text-gray-500">weight</span>
+                    </template>
+                  </div>
+                  <p v-if="categories.length === 0" class="text-xs text-gray-500">No categories created yet. Create categories first.</p>
+                </div>
+              </UFormField>
+
+              <p v-if="formError" class="text-red-400 text-sm">{{ formError }}</p>
             </div>
           </div>
 
-          <p v-if="formError" class="text-red-400 text-sm mt-2">{{ formError }}</p>
-        </UCard>
+          <div class="flex gap-2 justify-end px-6 py-4 border-t border-gray-800 shrink-0">
+            <UButton variant="ghost" @click="showModal = false" class="cursor-pointer">Cancel</UButton>
+            <UButton :loading="saving" @click="handleSave" class="cursor-pointer">
+              {{ isEditing ? 'Save Changes' : 'Create Judge' }}
+            </UButton>
+          </div>
+        </div>
       </template>
     </UModal>
   </div>

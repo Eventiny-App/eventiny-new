@@ -65,8 +65,8 @@
     <!-- Create / Edit Modal -->
     <UModal v-model:open="showModal">
       <template #content>
-        <UCard>
-          <template #header>
+        <div class="flex flex-col max-h-[85dvh]">
+          <div class="px-6 pt-6 pb-3 shrink-0">
             <h3 class="text-lg font-semibold">{{ editing ? 'Edit Category' : 'New Category' }}</h3>
             <p class="text-sm text-gray-400 mt-1">
               {{ editing
@@ -74,57 +74,59 @@
                 : 'Choose the type of competition and configure its settings.'
               }}
             </p>
-          </template>
+          </div>
 
-          <div class="space-y-5">
-            <UFormField label="Category Name" help="A descriptive name, e.g. 'Breaking Top 16', 'Hip Hop Crew Choreo'.">
-              <UInput v-model="form.name" placeholder="Category name" class="w-full" />
-            </UFormField>
-
-            <UFormField v-if="!editing" label="Type" help="Versus = elimination bracket after preselections. Choreographic = crews/soloists scored on multiple themes.">
-              <USelect v-model="form.type" :items="typeOptions" class="w-full" />
-            </UFormField>
-
-            <!-- Versus settings -->
-            <template v-if="form.type === 'battle'">
-              <UFormField label="Bracket Size" help="How many dancers advance from preselections to the versus bracket. If more participants register, the rest are eliminated in preselections.">
-                <USelect v-model="form.bracketSize" :items="bracketSizeOptions" class="w-full" />
+          <div class="overflow-y-auto px-6 flex-1">
+            <div class="space-y-5 pb-2">
+              <UFormField label="Category Name" help="A descriptive name, e.g. 'Breaking Top 16', 'Hip Hop Crew Choreo'.">
+                <UInput v-model="form.name" placeholder="Category name" class="w-full" />
               </UFormField>
 
-              <UFormField label="Versus Voting Mode" help="Hands = judges raise hands, host marks the winner manually. App = each judge selects the winner on their device, the app computes the result (supports weighted votes).">
-                <USelect v-model="form.battleVotingMode" :items="votingModeOptions" class="w-full" />
+              <UFormField v-if="!editing" label="Type" help="Versus = elimination bracket after preselections. Choreographic = crews/soloists scored on multiple themes.">
+                <USelect v-model="form.type" :items="typeOptions" class="w-full" />
               </UFormField>
-            </template>
 
-            <!-- Choreo settings -->
-            <template v-if="form.type === 'choreo'">
-              <UFormField label="Voting Themes" help="Judges will give a score (0–10) for each theme per participant. You can add, remove, or reorder themes.">
-                <div class="space-y-2">
-                  <div v-for="(theme, i) in form.choreoThemes" :key="i" class="flex gap-2">
-                    <UInput v-model="form.choreoThemes[i]" placeholder="Theme name" class="flex-1" />
-                    <UButton icon="i-lucide-x" variant="ghost" size="sm" color="error" class="cursor-pointer" @click="form.choreoThemes.splice(i, 1)" />
+              <!-- Versus settings -->
+              <template v-if="form.type === 'battle'">
+                <UFormField label="Bracket Size" help="How many dancers advance from preselections to the versus bracket. If more participants register, the rest are eliminated in preselections.">
+                  <USelect v-model="form.bracketSize" :items="bracketSizeOptions" class="w-full" />
+                </UFormField>
+
+                <UFormField label="Versus Voting Mode" help="Hands = judges raise hands, host marks the winner manually. App = each judge selects the winner on their device, the app computes the result (supports weighted votes).">
+                  <USelect v-model="form.battleVotingMode" :items="votingModeOptions" class="w-full" />
+                </UFormField>
+              </template>
+
+              <!-- Choreo settings -->
+              <template v-if="form.type === 'choreo'">
+                <UFormField label="Voting Themes" help="Judges will give a score (0–10) for each theme per participant. You can add, remove, or reorder themes.">
+                  <div class="space-y-2">
+                    <div v-for="(theme, i) in form.choreoThemes" :key="i" class="flex gap-2">
+                      <UInput v-model="form.choreoThemes[i]" placeholder="Theme name" class="flex-1" />
+                      <UButton icon="i-lucide-x" variant="ghost" size="sm" color="error" class="cursor-pointer" @click="form.choreoThemes.splice(i, 1)" />
+                    </div>
+                    <UButton icon="i-lucide-plus" variant="ghost" size="sm" class="cursor-pointer" @click="form.choreoThemes.push('')">
+                      Add theme
+                    </UButton>
                   </div>
-                  <UButton icon="i-lucide-plus" variant="ghost" size="sm" class="cursor-pointer" @click="form.choreoThemes.push('')">
-                    Add theme
-                  </UButton>
-                </div>
-              </UFormField>
+                </UFormField>
 
-              <UFormField label="Versus Phase (optional)" help="After scoring, optionally have the top N crews compete in an elimination bracket. Leave empty for ranking-only.">
-                <UInput v-model.number="form.choreoBattleTop" type="number" placeholder="e.g. 4" class="w-full" />
-              </UFormField>
-            </template>
+                <UFormField label="Versus Phase (optional)" help="After scoring, optionally have the top N crews compete in an elimination bracket. Leave empty for ranking-only.">
+                  <UInput v-model.number="form.choreoBattleTop" type="number" placeholder="e.g. 4" class="w-full" />
+                </UFormField>
+              </template>
 
-            <div class="flex gap-2 justify-end pt-2">
-              <UButton variant="ghost" @click="showModal = false" class="cursor-pointer">Cancel</UButton>
-              <UButton :loading="saving" @click="handleSave" class="cursor-pointer">
-                {{ editing ? 'Save Changes' : 'Create Category' }}
-              </UButton>
+              <p v-if="formError" class="text-red-400 text-sm">{{ formError }}</p>
             </div>
           </div>
 
-          <p v-if="formError" class="text-red-400 text-sm mt-2">{{ formError }}</p>
-        </UCard>
+          <div class="flex gap-2 justify-end px-6 py-4 border-t border-gray-800 shrink-0">
+            <UButton variant="ghost" @click="showModal = false" class="cursor-pointer">Cancel</UButton>
+            <UButton :loading="saving" @click="handleSave" class="cursor-pointer">
+              {{ editing ? 'Save Changes' : 'Create Category' }}
+            </UButton>
+          </div>
+        </div>
       </template>
     </UModal>
   </div>
