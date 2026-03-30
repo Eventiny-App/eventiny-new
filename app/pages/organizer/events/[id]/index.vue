@@ -9,6 +9,9 @@
         <UButton variant="ghost" icon="i-lucide-pencil" size="sm" @click="showEditEvent = true" class="cursor-pointer">
           Edit
         </UButton>
+        <UButton variant="ghost" color="error" icon="i-lucide-trash-2" size="sm" @click="showDeleteConfirm = true" class="cursor-pointer">
+          Delete
+        </UButton>
         <UButton variant="ghost" icon="i-lucide-log-out" @click="logout" class="cursor-pointer" />
       </div>
     </nav>
@@ -84,6 +87,25 @@
       </UCard>
     </div>
 
+    <!-- Delete Confirmation Modal -->
+    <UModal v-model:open="showDeleteConfirm">
+      <template #content>
+        <UCard>
+          <template #header>
+            <h3 class="text-lg font-semibold text-red-400">Delete Event</h3>
+          </template>
+          <p class="text-sm text-gray-300">
+            Are you sure you want to delete <strong>{{ eventData?.name }}</strong>? This will permanently remove all categories, participants, judges, hosts, votes, and brackets associated with this event.
+          </p>
+          <p class="text-sm text-red-400 mt-2">This action cannot be undone.</p>
+          <div class="flex gap-2 justify-end mt-4">
+            <UButton variant="ghost" @click="showDeleteConfirm = false" class="cursor-pointer">Cancel</UButton>
+            <UButton color="error" :loading="deleting" @click="handleDeleteEvent" class="cursor-pointer">Delete Event</UButton>
+          </div>
+        </UCard>
+      </template>
+    </UModal>
+
     <!-- Edit Event Modal -->
     <UModal v-model:open="showEditEvent">
       <template #content>
@@ -129,6 +151,20 @@ async function loadEvent() {
 }
 
 onMounted(() => loadEvent())
+
+// Delete
+const showDeleteConfirm = ref(false)
+const deleting = ref(false)
+
+async function handleDeleteEvent() {
+  deleting.value = true
+  try {
+    await $fetch(`/api/events/${eventId}`, { method: 'DELETE' })
+    navigateTo('/organizer')
+  } finally {
+    deleting.value = false
+  }
+}
 
 // Edit
 const showEditEvent = ref(false)
