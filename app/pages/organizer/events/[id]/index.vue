@@ -95,12 +95,18 @@
             <h3 class="text-lg font-semibold text-red-400">Delete Event</h3>
           </template>
           <p class="text-sm text-gray-300">
-            Are you sure you want to delete <strong>{{ eventData?.name }}</strong>? This will permanently remove all categories, participants, judges, hosts, votes, and brackets associated with this event.
+            This will permanently remove all categories, participants, judges, hosts, votes, and brackets associated with <strong>{{ eventData?.name }}</strong>.
           </p>
           <p class="text-sm text-red-400 mt-2">This action cannot be undone.</p>
+          <UFormField class="mt-4">
+            <template #label>
+              <span class="text-sm text-gray-300">Type <strong>{{ eventData?.name }}</strong> to confirm</span>
+            </template>
+            <UInput v-model="deleteConfirmName" placeholder="Event name" class="w-full" />
+          </UFormField>
           <div class="flex gap-2 justify-end mt-4">
             <UButton variant="ghost" @click="showDeleteConfirm = false" class="cursor-pointer">Cancel</UButton>
-            <UButton color="error" :loading="deleting" @click="handleDeleteEvent" class="cursor-pointer">Delete Event</UButton>
+            <UButton color="error" :loading="deleting" :disabled="!deleteNameMatches" @click="handleDeleteEvent" class="cursor-pointer">Delete Event</UButton>
           </div>
         </UCard>
       </template>
@@ -154,7 +160,13 @@ onMounted(() => loadEvent())
 
 // Delete
 const showDeleteConfirm = ref(false)
+const deleteConfirmName = ref('')
 const deleting = ref(false)
+const deleteNameMatches = computed(() => deleteConfirmName.value === eventData.value?.name)
+
+watch(showDeleteConfirm, (v) => {
+  if (!v) deleteConfirmName.value = ''
+})
 
 async function handleDeleteEvent() {
   deleting.value = true
