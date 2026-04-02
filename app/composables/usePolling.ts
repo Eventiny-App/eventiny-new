@@ -2,12 +2,14 @@
  * usePolling — periodically fetches remote state and returns reactive data.
  *
  * Usage:
- *   const { data, loading, error, refresh } = usePolling('/api/some/endpoint', { interval: 3000 })
+ *   const { data, loading, error, refresh } = usePolling('/api/some/endpoint')
  *
+ * The default interval comes from runtimeConfig.public.pollingInterval.
  * Automatically starts on mount and stops on unmount.
  */
 export function usePolling<T>(url: string | Ref<string>, opts: { interval?: number; immediate?: boolean } = {}) {
-  const interval = opts.interval ?? 3000
+  const config = useRuntimeConfig()
+  const interval = opts.interval ?? (config.public.pollingInterval as number) ?? 2500
   const immediate = opts.immediate ?? true
 
   const data = ref<T | null>(null) as Ref<T | null>

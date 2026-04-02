@@ -4,8 +4,15 @@ export default defineEventHandler(async (event) => {
   const eventId = getRouterParam(event, 'eventId')
   if (!eventId) throw createError({ statusCode: 400, statusMessage: 'Missing event ID' })
 
+  const where: any = { eventId }
+
+  // Judges only see categories they are assigned to
+  if (auth.role === 'judge' && auth.judgeId) {
+    where.judgeCategories = { some: { judgeId: auth.judgeId } }
+  }
+
   const categories = await prisma.category.findMany({
-    where: { eventId },
+    where,
     include: {
       choreoThemes: { orderBy: { sortOrder: 'asc' } },
       categoryState: true,

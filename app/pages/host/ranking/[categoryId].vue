@@ -125,7 +125,7 @@ function getThemeScore(r: any, themeId: string) {
 
 function goBack() {
   if (isHost.value) {
-    navigateTo('/host')
+    navigateTo(`/host?category=${categoryId}`)
   } else {
     navigateTo(`/organizer/events/${eventId.value}`)
   }

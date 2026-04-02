@@ -154,92 +154,140 @@
             </UButton>
           </div>
 
-          <!-- All participants order -->
+          <!-- All participants order (clickable to jump) -->
           <UCard>
-            <template #header><h3 class="font-semibold text-sm">Participant Order</h3></template>
-            <div class="space-y-1">
-              <div
+            <template #header>
+              <div class="flex items-center justify-between">
+                <h3 class="font-semibold text-sm">Participant Order</h3>
+                <span class="text-xs text-gray-500">click to jump</span>
+              </div>
+            </template>
+            <div class="space-y-1 max-h-64 overflow-y-auto">
+              <button
                 v-for="p in catState.participantVoteStatus"
                 :key="p.participantId"
-                class="flex items-center justify-between py-1 px-2 rounded text-sm"
-                :class="p.participantId === catState.currentParticipantId ? 'bg-green-900/30 border border-green-700' : ''"
+                class="w-full flex items-center justify-between py-1.5 px-2 rounded text-sm transition-colors cursor-pointer"
+                :class="p.participantId === catState.currentParticipantId ? 'bg-green-900/40 border border-green-600' : 'hover:bg-gray-800'"
+                @click="goToParticipantById(p.participantId)"
               >
                 <span :class="p.participantId === catState.currentParticipantId ? 'text-green-400 font-medium' : 'text-gray-300'">
                   {{ p.orderPosition }}. {{ p.participantName }}
                 </span>
-              </div>
+                <span v-if="p.allJudgesVoted" class="text-green-400 text-xs">✓</span>
+                <span v-else class="text-gray-600 text-xs">{{ p.judgeVotes?.filter((j: any) => j.hasVoted).length || 0 }}/{{ p.judgeVotes?.length || 0 }}</span>
+              </button>
             </div>
           </UCard>
         </div>
 
         <!-- RANKING phase -->
-        <UCard v-else-if="catState?.phase === 'ranking'">
-          <template #header><h3 class="font-semibold">Preselection Complete — Ranking</h3></template>
-          <div class="space-y-3">
-            <p class="text-sm text-gray-400">
-              Preselection voting is finished. View the ranking to see scores, then proceed to versus rounds
-              (if configured for this category).
-            </p>
-
-            <!-- Tie resolution UI -->
-            <div v-if="tieInfo" class="bg-yellow-900/20 border border-yellow-700 rounded p-3 space-y-3">
-              <p class="text-sm text-yellow-400 font-medium">⚠ Tie at bracket cutoff (top {{ catState.bracketSize }})</p>
-              <p class="text-xs text-yellow-300/80">
-                The following dancers are tied at position {{ tieInfo.cutoffRank }}. Select exactly
-                <strong>{{ tieInfo.slotsAvailable }}</strong> to fill the remaining bracket spot{{ tieInfo.slotsAvailable > 1 ? 's' : '' }}.
-              </p>
-              <div class="space-y-1">
-                <label
-                  v-for="p in tieInfo.tiedParticipants"
-                  :key="p.participantId"
-                  class="flex items-center gap-2 py-1 px-2 rounded text-sm cursor-pointer hover:bg-gray-800"
-                >
-                  <input
-                    type="checkbox"
-                    :checked="tieSelections.has(p.participantId)"
-                    @change="toggleTieSelection(p.participantId)"
-                    class="accent-green-500"
-                  />
-                  <span>{{ p.participantName }}</span>
-                  <span class="text-xs text-gray-500 ml-auto">avg {{ p.averageScore.toFixed(2) }}</span>
-                </label>
+        <div v-else-if="catState?.phase === 'ranking'" class="space-y-4">
+          <UCard>
+            <template #header><h3 class="font-semibold">Preselection Complete — Ranking</h3></template>
+            <div class="space-y-3">
+              <!-- Tie resolution UI -->
+              <div v-if="tieInfo" class="bg-yellow-900/20 border border-yellow-700 rounded p-3 space-y-3">
+                <p class="text-sm text-yellow-400 font-medium">⚠ Tie at bracket cutoff (top {{ catState.bracketSize }})</p>
+                <p class="text-xs text-yellow-300/80">
+                  The following dancers are tied at position {{ tieInfo.cutoffRank }}. Select exactly
+                  <strong>{{ tieInfo.slotsAvailable }}</strong> to fill the remaining bracket spot{{ tieInfo.slotsAvailable > 1 ? 's' : '' }}.
+                </p>
+                <div class="space-y-1">
+                  <label
+                    v-for="p in tieInfo.tiedParticipants"
+                    :key="p.participantId"
+                    class="flex items-center gap-2 py-1 px-2 rounded text-sm cursor-pointer hover:bg-gray-800"
+                  >
+                    <input
+                      type="checkbox"
+                      :checked="tieSelections.has(p.participantId)"
+                      @change="toggleTieSelection(p.participantId)"
+                      class="accent-green-500"
+                    />
+                    <span>{{ p.participantName }}</span>
+                    <span class="text-xs text-gray-500 ml-auto">avg {{ p.averageScore.toFixed(2) }}</span>
+                  </label>
+                </div>
+                <p class="text-xs" :class="tieSelections.size === tieInfo.slotsAvailable ? 'text-green-400' : 'text-gray-500'">
+                  Selected: {{ tieSelections.size }} / {{ tieInfo.slotsAvailable }}
+                </p>
               </div>
-              <p class="text-xs" :class="tieSelections.size === tieInfo.slotsAvailable ? 'text-green-400' : 'text-gray-500'">
-                Selected: {{ tieSelections.size }} / {{ tieInfo.slotsAvailable }}
-              </p>
-            </div>
 
-            <div class="flex gap-3 flex-wrap">
-              <UButton variant="outline" icon="i-lucide-arrow-left" @click="doAction('back-to-preselection')" :loading="actionLoading" class="cursor-pointer">
-                Back to Preselection
-              </UButton>
-              <UButton variant="outline" @click="navigateTo(`/host/ranking/${selectedCategoryId}`)" class="cursor-pointer">
-                View Ranking
-              </UButton>
-              <UButton
-                v-if="catState.bracketSize"
-                @click="generateBracketAndStart"
-                :loading="actionLoading"
-                :disabled="tieInfo && tieSelections.size !== tieInfo.slotsAvailable"
-                class="cursor-pointer"
-              >
-                Generate Bracket & Start Versus
-              </UButton>
-              <p v-if="tieInfo && tieSelections.size !== tieInfo.slotsAvailable" class="text-xs text-red-400">
-                Select exactly {{ tieInfo.slotsAvailable }} tied dancer{{ tieInfo.slotsAvailable > 1 ? 's' : '' }} above to proceed ({{ tieSelections.size }} selected)
-              </p>
-              <UButton
-                v-else
-                color="success"
-                @click="doAction('complete')"
-                :loading="actionLoading"
-                class="cursor-pointer"
-              >
-                Mark Complete
-              </UButton>
+              <div class="flex gap-3 flex-wrap">
+                <UButton variant="outline" icon="i-lucide-arrow-left" @click="doAction('back-to-preselection')" :loading="actionLoading" class="cursor-pointer">
+                  Back to Preselection
+                </UButton>
+                <UButton
+                  v-if="catState.bracketSize"
+                  @click="generateBracketAndStart"
+                  :loading="actionLoading"
+                  :disabled="tieInfo && tieSelections.size !== tieInfo.slotsAvailable"
+                  class="cursor-pointer"
+                >
+                  Generate Bracket & Start Versus
+                </UButton>
+                <p v-if="tieInfo && tieSelections.size !== tieInfo.slotsAvailable" class="text-xs text-red-400">
+                  Select exactly {{ tieInfo.slotsAvailable }} tied dancer{{ tieInfo.slotsAvailable > 1 ? 's' : '' }} above to proceed ({{ tieSelections.size }} selected)
+                </p>
+                <UButton
+                  v-if="catState.type !== 'battle'"
+                  color="success"
+                  @click="doAction('complete')"
+                  :loading="actionLoading"
+                  class="cursor-pointer"
+                >
+                  Mark Complete
+                </UButton>
+              </div>
             </div>
-          </div>
-        </UCard>
+          </UCard>
+
+          <!-- Inline ranking table -->
+          <UCard v-if="rankingData">
+            <template #header>
+              <div class="flex items-center justify-between">
+                <h3 class="font-semibold text-sm">
+                  {{ rankingData.type === 'choreo' ? 'Choreographic Ranking' : 'Preselection Ranking' }}
+                </h3>
+                <UButton size="xs" variant="ghost" @click="navigateTo(`/host/ranking/${selectedCategoryId}`)" class="cursor-pointer">
+                  Full View
+                </UButton>
+              </div>
+            </template>
+
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="border-b border-gray-700">
+                    <th class="text-left py-2 px-3">#</th>
+                    <th class="text-left py-2 px-3">Participant</th>
+                    <th class="text-right py-2 px-3">Average</th>
+                    <th v-for="js in (rankingData.ranking[0]?.judgeScores || [])" :key="js.judgeId" class="text-right py-2 px-3 text-xs">
+                      {{ js.judgeName }}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template v-for="(r, i) in rankingData.ranking" :key="r.participantId">
+                    <tr v-if="rankingData.bracketSize && i === rankingData.bracketSize">
+                      <td :colspan="3 + (rankingData.ranking[0]?.judgeScores?.length || 0)" class="py-0">
+                        <div class="border-t-2 border-green-500 my-1"></div>
+                      </td>
+                    </tr>
+                    <tr class="border-b border-gray-800" :class="{ 'opacity-50': rankingData.bracketSize && i >= rankingData.bracketSize }">
+                      <td class="py-2 px-3 font-medium">{{ r.rank }}</td>
+                      <td class="py-2 px-3">{{ r.participantName }}</td>
+                      <td class="py-2 px-3 text-right font-bold text-green-400">{{ r.averageScore.toFixed(2) }}</td>
+                      <td v-for="js in r.judgeScores" :key="js.judgeId" class="py-2 px-3 text-right text-xs">
+                        {{ js.score !== null && js.score !== undefined ? (typeof js.score === 'number' ? js.score.toFixed(1) : js.averageScore?.toFixed(1) || '—') : '—' }}
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </UCard>
+        </div>
 
         <!-- BATTLES phase -->
         <div v-else-if="catState?.phase === 'battles'" class="space-y-4">
@@ -455,6 +503,12 @@ const { state: authState, logout, fetchMe, isHost } = useAuth()
 onMounted(async () => {
   await fetchMe()
   if (!isHost.value) navigateTo('/')
+  // Auto-select category from query param (e.g., returning from ranking page)
+  const route = useRoute()
+  if (route.query.category && typeof route.query.category === 'string') {
+    await loadCategories()
+    selectCategory(route.query.category)
+  }
 })
 
 const eventId = computed(() => authState.value?.eventId || '')
@@ -488,7 +542,6 @@ const stateUrl = computed(() =>
 )
 
 const { data: polledState, stop: stopPolling, start: startPolling } = usePolling(stateUrl, {
-  interval: 2500,
   immediate: false,
 })
 
@@ -556,6 +609,10 @@ async function goToParticipant(index: number) {
   const p = catState.value?.participants?.[index]
   if (!p) return
   await doAction('set-current-participant', { participantId: p.id })
+}
+
+async function goToParticipantById(participantId: string) {
+  await doAction('set-current-participant', { participantId })
 }
 
 // Reset modal

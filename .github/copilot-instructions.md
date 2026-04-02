@@ -10,7 +10,7 @@ Dance event management PWA. Four roles: **SuperAdmin**, **Organizer**, **Judge**
 - **Backend**: Nitro server engine (file-based API routes), Zod validation
 - **Database**: Prisma 6 — SQLite locally (`prisma/dev.db`), PostgreSQL/Neon in production
 - **Auth**: JWT (jsonwebtoken + bcryptjs), httpOnly cookie, PIN-based login for judges/hosts
-- **Real-time**: Short polling via `usePolling` composable (3s default)
+- **Real-time**: Short polling via `usePolling` composable — interval from `runtimeConfig.public.pollingInterval` (default 1500ms)
 - **PWA**: @vite-pwa/nuxt
 - **Icons**: Lucide via `@iconify-json/lucide` (prefix `i-lucide-`)
 
@@ -57,7 +57,7 @@ prisma/
 ## Frontend Conventions
 
 - **Components**: Nuxt UI v3 components (`UButton`, `UCard`, `UInput`, `UModal`, `UTable`, etc.). Dark theme by default (`bg-gray-950 text-white`).
-- **Data fetching**: Use `$fetch` for mutations and one-off requests. Use `usePolling<T>(url)` for live data that auto-refreshes.
+- **Data fetching**: Use `$fetch` for mutations and one-off requests. Use `usePolling<T>(url)` for live data that auto-refreshes. Do not pass a custom `interval` to `usePolling` — the global default from `runtimeConfig.public.pollingInterval` is used automatically.
 - **Auth state**: `useAuth()` composable — provides `isLoggedIn`, `isAdmin`, `isOrganizer`, `isJudge`, `isHost`, `login()`, `loginWithPin()`, `logout()`, `fetchMe()`.
 - **Navigation**: `navigateTo()` for programmatic routing. Nuxt file-based routing for pages.
 - **Icons**: `icon="i-lucide-icon-name"` on Nuxt UI components.
@@ -79,3 +79,9 @@ prisma/
 - Organizer ownership is enforced server-side (`organizerId` checked on every event query)
 - Event IDs are CUIDs (unguessable room codes), not sequential
 - Sanitize all user-facing string inputs via `validateName()`
+
+## Access Control
+
+- Judge category access is filtered server-side: the `/categories` endpoint only returns categories the judge is assigned to via `JudgeCategory`
+- Vote endpoints additionally verify `JudgeCategory` assignment before accepting scores
+- Host category access is controlled via `HostCategory` join model (frontend filters `assignedCategories`)

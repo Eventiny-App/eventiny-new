@@ -305,7 +305,6 @@ const stateUrl = computed(() =>
 )
 
 const { data: polledState, stop: stopPolling, start: startPolling } = usePolling(stateUrl, {
-  interval: 2500,
   immediate: false,
 })
 

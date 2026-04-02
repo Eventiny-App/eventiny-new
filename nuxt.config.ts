@@ -22,6 +22,7 @@ export default defineNuxtConfig({
     superadminPassword: process.env.SUPERADMIN_PASSWORD || 'changeme',
     public: {
       appName: 'Eventiny',
+      pollingInterval: 1500,
     },
   },
 
