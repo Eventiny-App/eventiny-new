@@ -304,7 +304,7 @@
               </div>
             </template>
             <p class="text-xs text-gray-500 mb-3">
-              {{ catState.battleVotingMode === 'app' ? 'App voting: judges vote on their devices, then you confirm the winner.' : 'Hands voting: observe the crowd/panel reaction and pick the winner below.' }}
+              {{ catState.battleVotingMode === 'app' ? 'App voting: judges vote on their devices. The winner is determined automatically by weighted votes. If tied, you can restart the battle.' : 'Hands voting: observe the crowd/panel reaction and pick the winner below.' }}
             </p>
 
             <!-- Current matchup highlight -->
@@ -313,30 +313,64 @@
               <div class="flex items-center justify-between gap-4">
                 <button
                   class="flex-1 text-center py-3 rounded-lg text-lg font-bold transition-all cursor-pointer"
-                  :class="selectedWinnerId === currentMatchup.participant1?.id ? 'bg-green-600 text-white' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'"
-                  @click="selectedWinnerId = currentMatchup.participant1?.id"
+                  :class="selectedWinnerId === currentMatchup.participant1?.id ? 'bg-green-600 text-white' : 'bg-blue-800 text-blue-100 hover:bg-blue-700'"
+                  @click="catState.battleVotingMode !== 'app' ? selectedWinnerId = currentMatchup.participant1?.id : null"
+                  :disabled="catState.battleVotingMode === 'app'"
                 >
                   {{ currentMatchup.participant1?.name || 'BYE' }}
                 </button>
                 <span class="text-gray-500 font-bold text-sm">VS</span>
                 <button
                   class="flex-1 text-center py-3 rounded-lg text-lg font-bold transition-all cursor-pointer"
-                  :class="selectedWinnerId === currentMatchup.participant2?.id ? 'bg-green-600 text-white' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'"
-                  @click="selectedWinnerId = currentMatchup.participant2?.id"
+                  :class="selectedWinnerId === currentMatchup.participant2?.id ? 'bg-green-600 text-white' : 'bg-orange-800 text-orange-100 hover:bg-orange-700'"
+                  @click="catState.battleVotingMode !== 'app' ? selectedWinnerId = currentMatchup.participant2?.id : null"
+                  :disabled="catState.battleVotingMode === 'app'"
                 >
                   {{ currentMatchup.participant2?.name || 'BYE' }}
                 </button>
               </div>
 
               <!-- App voting status -->
-              <div v-if="catState.battleVotingMode === 'app' && currentMatchup.battleVotes?.length" class="mt-3 space-y-1">
-                <p class="text-xs text-gray-500">Judge votes:</p>
-                <div v-for="v in currentMatchup.battleVotes" :key="v.id" class="text-xs text-gray-400">
-                  {{ v.judge.name }} → {{ v.votedParticipantId === currentMatchup.participant1?.id ? currentMatchup.participant1?.name : currentMatchup.participant2?.name }}
+              <template v-if="catState.battleVotingMode === 'app'">
+                <div class="mt-3 space-y-1">
+                  <p class="text-xs text-gray-500">Judge votes: {{ currentMatchup.battleVotes?.length || 0 }} / {{ catState.totalJudges }}</p>
+                  <div v-for="v in currentMatchup.battleVotes" :key="v.id" class="text-xs text-gray-400">
+                    {{ v.judge.name }} → <span :class="v.votedParticipantId === currentMatchup.participant1?.id ? 'text-blue-400' : 'text-orange-400'">{{ v.votedParticipantId === currentMatchup.participant1?.id ? currentMatchup.participant1?.name : currentMatchup.participant2?.name }}</span>
+                  </div>
                 </div>
-              </div>
 
+                <!-- Auto-resolved winner -->
+                <div v-if="currentMatchup.winnerId" class="mt-3 bg-green-900/30 border border-green-700 rounded p-2 text-center">
+                  <p class="text-sm text-green-400 font-semibold">
+                    Winner: {{ currentMatchup.winnerId === currentMatchup.participant1?.id ? currentMatchup.participant1?.name : currentMatchup.participant2?.name }}
+                  </p>
+                  <p class="text-xs text-gray-500">Automatically resolved by judge votes.</p>
+                </div>
+
+                <!-- Tie detected -->
+                <div v-else-if="(currentMatchup.battleVotes?.length || 0) >= catState.totalJudges && !currentMatchup.winnerId" class="mt-3 bg-yellow-900/30 border border-yellow-700 rounded p-3 text-center space-y-2">
+                  <p class="text-sm text-yellow-400 font-semibold">Tie — Revote needed</p>
+                  <p class="text-xs text-gray-400">All judges voted but the weighted scores are tied. Restart the battle to clear votes and let judges re-vote.</p>
+                  <UButton
+                    color="warning"
+                    size="sm"
+                    @click="restartBattle"
+                    :loading="actionLoading"
+                    class="cursor-pointer"
+                  >
+                    Restart Battle
+                  </UButton>
+                </div>
+
+                <!-- Waiting for votes -->
+                <div v-else class="mt-3">
+                  <p class="text-xs text-gray-500">Waiting for all judges to vote…</p>
+                </div>
+              </template>
+
+              <!-- Hands voting: host picks winner manually -->
               <UButton
+                v-if="catState.battleVotingMode !== 'app'"
                 block
                 class="mt-4 cursor-pointer"
                 :disabled="!selectedWinnerId"
@@ -503,10 +537,10 @@ const { state: authState, logout, fetchMe, isHost } = useAuth()
 onMounted(async () => {
   await fetchMe()
   if (!isHost.value) navigateTo('/')
+  await loadCategories()
   // Auto-select category from query param (e.g., returning from ranking page)
   const route = useRoute()
   if (route.query.category && typeof route.query.category === 'string') {
-    await loadCategories()
     selectCategory(route.query.category)
   }
 })
@@ -520,7 +554,10 @@ const allCategories = ref<any[]>([])
 const assignedCategories = computed(() => allCategories.value)
 
 async function loadCategories() {
-  if (!eventId.value) return
+  if (!eventId.value) {
+    loadingCategories.value = false
+    return
+  }
   loadingCategories.value = true
   try {
     allCategories.value = (await $fetch(`/api/events/${eventId.value}/categories`)) as any[]
@@ -528,8 +565,6 @@ async function loadCategories() {
     loadingCategories.value = false
   }
 }
-
-onMounted(() => loadCategories())
 
 // Category state polling
 const selectedCategoryId = ref<string | null>(null)
@@ -546,7 +581,13 @@ const { data: polledState, stop: stopPolling, start: startPolling } = usePolling
 })
 
 watch(polledState, (val) => {
-  if (val) catState.value = val
+  if (val) {
+    catState.value = val
+    // Auto-reload bracket during battles to reflect vote updates and auto-resolved winners
+    if ((val as any).phase === 'battles' && selectedCategoryId.value) {
+      loadBracket()
+    }
+  }
 })
 
 async function selectCategory(catId: string) {
@@ -840,6 +881,18 @@ async function confirmBattleWinner() {
     await loadBracket()
   } catch (e: any) {
     alert(e?.data?.statusMessage || 'Failed to set winner')
+  } finally {
+    actionLoading.value = false
+  }
+}
+
+async function restartBattle() {
+  actionLoading.value = true
+  try {
+    await doAction('restart-battle')
+    await loadBracket()
+  } catch (e: any) {
+    alert(e?.data?.statusMessage || 'Failed to restart battle')
   } finally {
     actionLoading.value = false
   }

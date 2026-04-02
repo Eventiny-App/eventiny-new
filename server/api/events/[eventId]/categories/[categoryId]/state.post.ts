@@ -7,6 +7,7 @@ const schema = z.object({
     'finish-preselection',
     'start-battles',
     'set-current-matchup',
+    'restart-battle',
     'complete',
     'back-to-ranking',
     'back-to-preselection',
@@ -169,6 +170,32 @@ export default defineEventHandler(async (event) => {
       })
 
       return { success: true, currentMatchupId: matchupId }
+    }
+
+    case 'restart-battle': {
+      if (state.phase !== 'battles') {
+        throw createError({ statusCode: 400, statusMessage: 'Not in battles phase' })
+      }
+      if (!state.currentMatchupId) {
+        throw createError({ statusCode: 400, statusMessage: 'No current matchup to restart' })
+      }
+
+      const currentMatchup = await prisma.battleMatchup.findFirst({
+        where: { id: state.currentMatchupId, categoryId },
+      })
+      if (!currentMatchup) {
+        throw createError({ statusCode: 404, statusMessage: 'Current matchup not found' })
+      }
+      if (currentMatchup.winnerId) {
+        throw createError({ statusCode: 400, statusMessage: 'Cannot restart a matchup that already has a winner' })
+      }
+
+      // Delete all votes for this matchup so judges can re-vote
+      await prisma.battleVote.deleteMany({
+        where: { matchupId: state.currentMatchupId },
+      })
+
+      return { success: true, restarted: true, matchupId: state.currentMatchupId }
     }
 
     case 'back-to-ranking': {

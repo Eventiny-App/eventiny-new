@@ -58,6 +58,7 @@ prisma/
 
 - **Components**: Nuxt UI v3 components (`UButton`, `UCard`, `UInput`, `UModal`, `UTable`, etc.). Dark theme by default (`bg-gray-950 text-white`).
 - **Data fetching**: Use `$fetch` for mutations and one-off requests. Use `usePolling<T>(url)` for live data that auto-refreshes. Do not pass a custom `interval` to `usePolling` — the global default from `runtimeConfig.public.pollingInterval` is used automatically.
+- **Page init**: In pages that need auth before loading data (host, judge), use a single `onMounted(async () => { await fetchMe(); await loadData() })`. Never split into two `onMounted` hooks — it causes race conditions where data loads before auth is ready.
 - **Auth state**: `useAuth()` composable — provides `isLoggedIn`, `isAdmin`, `isOrganizer`, `isJudge`, `isHost`, `login()`, `loginWithPin()`, `logout()`, `fetchMe()`.
 - **Navigation**: `navigateTo()` for programmatic routing. Nuxt file-based routing for pages.
 - **Icons**: `icon="i-lucide-icon-name"` on Nuxt UI components.
@@ -72,6 +73,19 @@ prisma/
 - PINs: `@@unique([eventId, accessPin])` ensures unique PINs within an event across judges and hosts separately
 - **Schema provider**: `schema.prisma` uses `postgresql` as the datasource provider. Locally, set `DATABASE_URL` to a file-based SQLite URL or a local PostgreSQL instance; in production, Neon PostgreSQL.
 - **Category dual state**: `Category.status` stores the phase (idle/preselection/ranking/battles/completed), and `CategoryState` model stores live state (current participant, current matchup, timer). Both must be updated during phase transitions.
+
+## Battle Voting (App Mode)
+
+- **Auto-winner**: When all assigned judges have voted on a matchup, the server (`vote.post.ts`) auto-tallies weighted votes (using `JudgeCategory.weight`) and sets the winner if there's a strict majority. The winner is automatically advanced to the next bracket round.
+- **Tie handling**: If weighted scores are tied, the matchup stays unresolved. The host must click "Restart Battle" (triggers `restart-battle` action in `state.post.ts`), which clears all `BattleVote` records for that matchup so judges can re-vote.
+- **No manual override**: In app voting mode, `winner.post.ts` rejects manual winner selection (400 error). Only "hands" mode allows the host to pick winners directly.
+- **UI colors**: Battle participant buttons use distinct colors — P1: blue (`bg-blue-800`), P2: orange (`bg-orange-800`). Selected state is green.
+
+## Participant Locking
+
+- Once a category leaves IDLE phase, participants **cannot be removed** from that category. The server (`[participantId].patch.ts`) throws 400 if `removeCategoryIds` includes a non-IDLE category.
+- Adding participants to active categories is still allowed — they are appended at the end of the order.
+- Frontend disables category checkboxes for active categories when editing an existing participant (shows "locked" label).
 
 ## Security
 

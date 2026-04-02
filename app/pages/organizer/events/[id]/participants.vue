@@ -69,26 +69,17 @@
                   <div v-for="cat in categories" :key="cat.id" class="flex items-center gap-3">
                     <UCheckbox
                       :model-value="form.selectedCategoryIds.includes(cat.id)"
+                      :disabled="isEditing && editingOriginalCatIds.includes(cat.id) && getPhase(cat.id) !== 'idle'"
                       @update:model-value="(v: boolean) => toggleCategory(cat.id, v)"
                     />
-                    <span class="text-sm">{{ cat.name }}</span>
+                    <span class="text-sm" :class="{ 'opacity-50': isEditing && editingOriginalCatIds.includes(cat.id) && getPhase(cat.id) !== 'idle' }">{{ cat.name }}</span>
                     <UBadge :color="cat.type === 'battle' ? 'error' : 'info'" variant="subtle" size="xs">{{ cat.type }}</UBadge>
                     <UBadge v-if="getPhase(cat.id) !== 'idle'" variant="outline" size="xs">{{ getPhase(cat.id) }}</UBadge>
+                    <span v-if="isEditing && editingOriginalCatIds.includes(cat.id) && getPhase(cat.id) !== 'idle'" class="text-xs text-yellow-400">locked</span>
                   </div>
                   <p v-if="categories.length === 0" class="text-xs text-gray-500">No categories created yet.</p>
                 </div>
               </UFormField>
-
-              <div v-if="isEditing && withdrawWarnings.length" class="bg-yellow-900/20 border border-yellow-700 rounded p-3">
-                <p class="text-sm text-yellow-400 font-medium mb-1">⚠ Active category removal</p>
-                <p class="text-xs text-yellow-300/80">
-                  The following categories have already started. Unchecking them will mark the participant as
-                  <strong>withdrawn</strong> (soft-removed), not fully deleted, so existing scores are preserved:
-                </p>
-                <ul class="text-xs text-yellow-300/80 mt-1 list-disc list-inside">
-                  <li v-for="w in withdrawWarnings" :key="w">{{ w }}</li>
-                </ul>
-              </div>
 
               <p v-if="formError" class="text-red-400 text-sm">{{ formError }}</p>
             </div>
@@ -153,17 +144,6 @@ const editingOriginalCatIds = ref<string[]>([])
 const form = reactive({
   name: '',
   selectedCategoryIds: [] as string[],
-})
-
-const withdrawWarnings = computed(() => {
-  if (!isEditing.value) return []
-  const removed = editingOriginalCatIds.value.filter(id => !form.selectedCategoryIds.includes(id))
-  return removed
-    .filter(id => getPhase(id) !== 'idle')
-    .map(id => {
-      const cat = categories.value.find((c: any) => c.id === id)
-      return cat ? `${cat.name} (${getPhase(id)})` : id
-    })
 })
 
 function openCreate() {

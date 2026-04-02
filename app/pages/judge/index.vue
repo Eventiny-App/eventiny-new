@@ -239,14 +239,14 @@
               <div class="flex gap-4">
                 <button
                   class="flex-1 text-center py-6 rounded-lg text-xl font-bold transition-all cursor-pointer"
-                  :class="battleVote === currentBattleMatchup.participant1?.id ? 'bg-green-600 text-white scale-105' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'"
+                  :class="battleVote === currentBattleMatchup.participant1?.id ? 'bg-green-600 text-white scale-105' : 'bg-blue-800 text-blue-100 hover:bg-blue-700'"
                   @click="battleVote = currentBattleMatchup.participant1?.id"
                 >
                   {{ currentBattleMatchup.participant1?.name || '—' }}
                 </button>
                 <button
                   class="flex-1 text-center py-6 rounded-lg text-xl font-bold transition-all cursor-pointer"
-                  :class="battleVote === currentBattleMatchup.participant2?.id ? 'bg-green-600 text-white scale-105' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'"
+                  :class="battleVote === currentBattleMatchup.participant2?.id ? 'bg-green-600 text-white scale-105' : 'bg-orange-800 text-orange-100 hover:bg-orange-700'"
                   @click="battleVote = currentBattleMatchup.participant2?.id"
                 >
                   {{ currentBattleMatchup.participant2?.name || '—' }}
@@ -260,10 +260,23 @@
                 :loading="submitting"
                 @click="submitBattleVote"
               >
-                Submit Vote
+                {{ battleVoteSubmitted ? 'Change Vote' : 'Submit Vote' }}
               </UButton>
 
-              <p v-if="battleVoteSubmitted" class="text-xs text-green-400 text-center mt-2">Vote submitted!</p>
+              <div v-if="battleVoteSubmitted" class="mt-2 text-center space-y-1">
+                <p class="text-xs text-green-400">Vote submitted!</p>
+                <template v-if="battleVoteResult?.autoResolved">
+                  <p class="text-xs text-green-300 font-medium">
+                    Battle resolved! Winner: {{ battleVoteResult.winnerId === currentBattleMatchup.participant1?.id ? currentBattleMatchup.participant1?.name : currentBattleMatchup.participant2?.name }}
+                  </p>
+                </template>
+                <template v-else-if="battleVoteResult?.tied">
+                  <p class="text-xs text-yellow-400 font-medium">Tie detected — waiting for host to restart the battle.</p>
+                </template>
+                <template v-else-if="battleVoteResult?.allVoted === false">
+                  <p class="text-xs text-gray-500">Waiting for other judges… ({{ battleVoteResult.totalVoted }}/{{ battleVoteResult.totalAssigned }})</p>
+                </template>
+              </div>
             </UCard>
           </template>
         </div>
@@ -315,6 +328,12 @@ watch(polledState, (val) => {
 async function selectCategory(catId: string) {
   selectedCategoryId.value = catId
   catState.value = null
+  judgeSelectedParticipantId.value = null
+  myVotes.value = {}
+  myChoreoVotes.value = {}
+  battleVote.value = null
+  battleVoteSubmitted.value = false
+  currentBattleMatchup.value = null
   startPolling()
   await loadMyVotes()
 }
@@ -477,12 +496,14 @@ async function submitChoreoVote() {
 // Battle voting
 const battleVote = ref<string | null>(null)
 const battleVoteSubmitted = ref(false)
+const battleVoteResult = ref<{ autoResolved?: boolean; tied?: boolean; winnerId?: string; allVoted?: boolean; totalVoted?: number; totalAssigned?: number } | null>(null)
 const currentBattleMatchup = ref<any>(null)
 
 // Load current matchup during battles phase
 watch(() => catState.value?.currentMatchupId, async (matchupId) => {
   battleVote.value = null
   battleVoteSubmitted.value = false
+  battleVoteResult.value = null
   if (!matchupId || !selectedCategoryId.value) {
     currentBattleMatchup.value = null
     return
@@ -508,11 +529,12 @@ async function submitBattleVote() {
   if (!battleVote.value || !currentBattleMatchup.value) return
   submitting.value = true
   try {
-    await $fetch(`/api/events/${eventId.value}/categories/${selectedCategoryId.value}/matchups/${currentBattleMatchup.value.id}/vote`, {
+    const result = await $fetch<any>(`/api/events/${eventId.value}/categories/${selectedCategoryId.value}/matchups/${currentBattleMatchup.value.id}/vote`, {
       method: 'POST',
       body: { votedParticipantId: battleVote.value },
     })
     battleVoteSubmitted.value = true
+    battleVoteResult.value = result
   } catch (e: any) {
     alert(e?.data?.statusMessage || 'Failed to submit vote')
   } finally {

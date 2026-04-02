@@ -26,10 +26,16 @@ export default defineEventHandler(async (event) => {
 
   const matchup = await prisma.battleMatchup.findFirst({
     where: { id: matchupId, categoryId, category: { eventId } },
+    include: { category: { select: { battleVotingMode: true } } },
   })
 
   if (!matchup) {
     throw createError({ statusCode: 404, statusMessage: 'Matchup not found' })
+  }
+
+  // In app voting mode, winners are determined automatically by judge votes
+  if (matchup.category.battleVotingMode === 'app') {
+    throw createError({ statusCode: 400, statusMessage: 'In app voting mode, winners are determined by judge votes. The host cannot manually override the result.' })
   }
 
   if (winnerId !== matchup.participant1Id && winnerId !== matchup.participant2Id) {

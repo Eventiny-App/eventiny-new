@@ -76,7 +76,7 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  // Remove categories (soft-delete if started)
+  // Remove categories (blocked if category has started)
   if (body.removeCategoryIds?.length) {
     for (const catId of body.removeCategoryIds) {
       const pc = participant.participantCategories.find(
@@ -84,16 +84,13 @@ export default defineEventHandler(async (event) => {
       )
       if (!pc) continue
 
-      // Check if category has started — if so, soft-delete (withdraw)
+      // Check if category has started — if so, block removal entirely
       const catState = await prisma.categoryState.findUnique({
         where: { categoryId: catId },
       })
 
       if (catState && catState.phase !== 'idle') {
-        await prisma.participantCategory.update({
-          where: { id: pc.id },
-          data: { withdrawn: true },
-        })
+        throw createError({ statusCode: 400, statusMessage: `Cannot remove participant from category "${catId}": it has already started (${catState.phase})` })
       } else {
         await prisma.participantCategory.delete({
           where: { id: pc.id },

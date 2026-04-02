@@ -92,6 +92,7 @@
                     </template>
                   </div>
                   <p v-if="categories.length === 0" class="text-xs text-gray-500">No categories created yet. Create categories first.</p>
+                  <p v-else class="text-xs text-gray-500 mt-1">Weight is only shown for categories using "App" voting mode.</p>
                 </div>
               </UFormField>
 

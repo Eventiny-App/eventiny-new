@@ -62,5 +62,65 @@ export default defineEventHandler(async (event) => {
     },
   })
 
-  return { success: true, voteId: vote.id }
+  // Auto-resolve: check if all assigned judges have voted
+  const assignedJudges = await prisma.judgeCategory.findMany({
+    where: { categoryId },
+    select: { judgeId: true, weight: true },
+  })
+
+  const allVotes = await prisma.battleVote.findMany({
+    where: { matchupId },
+    select: { judgeId: true, votedParticipantId: true },
+  })
+
+  const totalAssigned = assignedJudges.length
+  const totalVoted = allVotes.length
+  const allJudgesVoted = totalVoted >= totalAssigned
+
+  if (!allJudgesVoted) {
+    return { success: true, voteId: vote.id, allVoted: false, autoResolved: false, tied: false, totalVoted, totalAssigned }
+  }
+
+  // All judges voted — tally weighted scores
+  const weightMap = new Map(assignedJudges.map(j => [j.judgeId, j.weight]))
+  let score1 = 0
+  let score2 = 0
+  for (const v of allVotes) {
+    const w = weightMap.get(v.judgeId) ?? 1
+    if (v.votedParticipantId === matchup.participant1Id) score1 += w
+    else if (v.votedParticipantId === matchup.participant2Id) score2 += w
+  }
+
+  if (score1 === score2) {
+    // Tie — host must restart the battle
+    return { success: true, voteId: vote.id, allVoted: true, autoResolved: false, tied: true, totalVoted, totalAssigned, score1, score2 }
+  }
+
+  // Clear winner — auto-resolve
+  const winnerId = score1 > score2 ? matchup.participant1Id! : matchup.participant2Id!
+
+  await prisma.battleMatchup.update({
+    where: { id: matchupId },
+    data: { winnerId },
+  })
+
+  // Advance winner to next round
+  if (matchup.bracket === 'winners') {
+    const nextRound = matchup.round + 1
+    const nextPosition = Math.ceil(matchup.position / 2)
+    const isTop = matchup.position % 2 === 1
+
+    const nextMatchup = await prisma.battleMatchup.findFirst({
+      where: { categoryId, bracket: 'winners', round: nextRound, position: nextPosition },
+    })
+
+    if (nextMatchup) {
+      await prisma.battleMatchup.update({
+        where: { id: nextMatchup.id },
+        data: isTop ? { participant1Id: winnerId } : { participant2Id: winnerId },
+      })
+    }
+  }
+
+  return { success: true, voteId: vote.id, allVoted: true, autoResolved: true, tied: false, winnerId, totalVoted, totalAssigned, score1, score2 }
 })
