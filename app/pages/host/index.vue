@@ -27,7 +27,7 @@
                 <span class="text-xs text-gray-500 ml-2">{{ cat.type === 'battle' ? 'versus' : 'choreo' }}</span>
               </div>
               <UBadge :color="phaseColor(cat.categoryState?.phase)" variant="outline">
-                {{ cat.categoryState?.phase || 'idle' }}
+                {{ formatPhase(cat.categoryState?.phase) }}
               </UBadge>
             </div>
           </UCard>
@@ -40,7 +40,7 @@
         <div class="flex items-center gap-3 mb-4">
           <UButton variant="ghost" icon="i-lucide-arrow-left" @click="selectedCategoryId = null" class="cursor-pointer" />
           <h2 class="text-lg font-semibold">{{ catState?.categoryName }}</h2>
-          <UBadge :color="phaseColor(catState?.phase)" variant="outline">{{ catState?.phase || 'idle' }}</UBadge>
+          <UBadge :color="phaseColor(catState?.phase)" variant="outline">{{ formatPhase(catState?.phase) }}</UBadge>
         </div>
 
         <!-- IDLE phase -->
@@ -739,6 +739,11 @@ function phaseColor(phase: string | undefined) {
     completed: 'success',
   }
   return (map[phase || 'idle'] || 'neutral') as any
+}
+
+function formatPhase(phase: string | undefined): string {
+  if (!phase || phase === 'idle') return 'not started'
+  return phase
 }
 
 // ─── Tie at cutoff handling ───────────────────────

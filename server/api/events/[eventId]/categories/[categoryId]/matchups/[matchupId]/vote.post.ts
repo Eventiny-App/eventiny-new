@@ -1,8 +1,12 @@
 import { z } from 'zod'
 
 const schema = z.object({
-  votedParticipantId: z.string().min(1),
-})
+  votedParticipantId: z.string().min(1).optional(),
+  isTie: z.boolean().optional(),
+}).refine(
+  data => (data.isTie && !data.votedParticipantId) || (!data.isTie && data.votedParticipantId),
+  { message: 'Provide either votedParticipantId or isTie, not both' }
+)
 
 /**
  * POST /api/events/:eventId/categories/:categoryId/matchups/:matchupId/vote
@@ -21,7 +25,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: parsed.error.errors[0].message })
   }
 
-  const { votedParticipantId } = parsed.data
+  const { votedParticipantId, isTie } = parsed.data
 
   // Verify matchup
   const matchup = await prisma.battleMatchup.findFirst({
@@ -32,7 +36,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, statusMessage: 'Matchup not found' })
   }
 
-  if (votedParticipantId !== matchup.participant1Id && votedParticipantId !== matchup.participant2Id) {
+  if (!isTie && votedParticipantId !== matchup.participant1Id && votedParticipantId !== matchup.participant2Id) {
     throw createError({ statusCode: 400, statusMessage: 'Must vote for one of the two battlers' })
   }
 
@@ -55,10 +59,12 @@ export default defineEventHandler(async (event) => {
     create: {
       matchupId,
       judgeId: user.judgeId!,
-      votedParticipantId,
+      votedParticipantId: isTie ? null : votedParticipantId!,
+      isTie: !!isTie,
     },
     update: {
-      votedParticipantId,
+      votedParticipantId: isTie ? null : votedParticipantId!,
+      isTie: !!isTie,
     },
   })
 
@@ -70,7 +76,7 @@ export default defineEventHandler(async (event) => {
 
   const allVotes = await prisma.battleVote.findMany({
     where: { matchupId },
-    select: { judgeId: true, votedParticipantId: true },
+    select: { judgeId: true, votedParticipantId: true, isTie: true },
   })
 
   const totalAssigned = assignedJudges.length
@@ -82,13 +88,20 @@ export default defineEventHandler(async (event) => {
   }
 
   // All judges voted — tally weighted scores
+  // Tie votes add weight to both sides equally
   const weightMap = new Map(assignedJudges.map(j => [j.judgeId, j.weight]))
   let score1 = 0
   let score2 = 0
   for (const v of allVotes) {
     const w = weightMap.get(v.judgeId) ?? 1
-    if (v.votedParticipantId === matchup.participant1Id) score1 += w
-    else if (v.votedParticipantId === matchup.participant2Id) score2 += w
+    if (v.isTie) {
+      score1 += w
+      score2 += w
+    } else if (v.votedParticipantId === matchup.participant1Id) {
+      score1 += w
+    } else if (v.votedParticipantId === matchup.participant2Id) {
+      score2 += w
+    }
   }
 
   if (score1 === score2) {

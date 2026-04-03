@@ -3,7 +3,7 @@
     <nav class="border-b border-gray-800 px-4 py-3 flex items-center gap-3">
       <UButton variant="ghost" icon="i-lucide-arrow-left" @click="goBack" class="cursor-pointer" />
       <h1 class="text-xl font-bold">Ranking</h1>
-      <UBadge v-if="ranking" variant="outline">{{ ranking.phase }}</UBadge>
+      <UBadge v-if="ranking" variant="outline">{{ ranking.phase === 'idle' ? 'not started' : ranking.phase }}</UBadge>
     </nav>
 
     <div class="max-w-4xl mx-auto p-4 sm:p-6 space-y-6">
@@ -66,7 +66,7 @@
                       {{ getThemeScore(r, theme.id) }}
                     </td>
                     <td v-for="js in r.judgeScores" :key="js.judgeId" class="py-2 px-3 text-right text-xs">
-                      {{ js.score !== null && js.score !== undefined ? (typeof js.score === 'number' ? js.score.toFixed(1) : js.averageScore?.toFixed(1) || '—') : '—' }}
+                      {{ (js.score ?? js.averageScore) != null ? (js.score ?? js.averageScore).toFixed(1) : '—' }}
                     </td>
                   </tr>
                 </template>

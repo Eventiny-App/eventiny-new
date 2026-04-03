@@ -275,8 +275,10 @@ model BattleVote {
   judgeId String
   judge   Judge @relation(fields: [judgeId], references: [id], onDelete: Cascade)
 
-  votedParticipantId String
-  votedParticipant   Participant @relation(fields: [votedParticipantId], references: [id], onDelete: Cascade)
+  votedParticipantId String?
+  votedParticipant   Participant? @relation(fields: [votedParticipantId], references: [id], onDelete: Cascade)
+
+  isTie Boolean @default(false)
 
   createdAt DateTime @default(now())
 

@@ -28,7 +28,7 @@
                 <span class="text-xs text-gray-500 ml-2">{{ cat.type === 'battle' ? 'versus' : 'choreo' }}</span>
               </div>
               <UBadge :color="phaseColor(cat.categoryState?.phase)" variant="outline">
-                {{ cat.categoryState?.phase || 'idle' }}
+                {{ formatPhase(cat.categoryState?.phase) }}
               </UBadge>
             </div>
           </UCard>
@@ -41,7 +41,7 @@
         <div class="flex items-center gap-3 mb-4">
           <UButton variant="ghost" icon="i-lucide-arrow-left" @click="selectedCategoryId = null" class="cursor-pointer" />
           <h2 class="text-lg font-semibold">{{ catState?.categoryName }}</h2>
-          <UBadge :color="phaseColor(catState?.phase)" variant="outline">{{ catState?.phase || 'idle' }}</UBadge>
+          <UBadge :color="phaseColor(catState?.phase)" variant="outline">{{ formatPhase(catState?.phase) }}</UBadge>
         </div>
 
         <!-- Waiting for preselection to start -->
@@ -252,6 +252,14 @@
                   {{ currentBattleMatchup.participant2?.name || '—' }}
                 </button>
               </div>
+
+              <button
+                class="w-full mt-3 text-center py-3 rounded-lg text-sm font-semibold transition-all cursor-pointer"
+                :class="battleVote === 'tie' ? 'bg-green-600 text-white scale-[1.02]' : 'bg-yellow-800 text-yellow-100 hover:bg-yellow-700'"
+                @click="battleVote = 'tie'"
+              >
+                Tie
+              </button>
 
               <UButton
                 block
@@ -516,7 +524,7 @@ watch(() => catState.value?.currentMatchupId, async (matchupId) => {
     if (matchup) {
       const existing = matchup.battleVotes?.find((v: any) => v.judgeId === authState.value?.judgeId)
       if (existing) {
-        battleVote.value = existing.votedParticipantId
+        battleVote.value = existing.isTie ? 'tie' : existing.votedParticipantId
         battleVoteSubmitted.value = true
       }
     }
@@ -529,9 +537,12 @@ async function submitBattleVote() {
   if (!battleVote.value || !currentBattleMatchup.value) return
   submitting.value = true
   try {
+    const body = battleVote.value === 'tie'
+      ? { isTie: true }
+      : { votedParticipantId: battleVote.value }
     const result = await $fetch<any>(`/api/events/${eventId.value}/categories/${selectedCategoryId.value}/matchups/${currentBattleMatchup.value.id}/vote`, {
       method: 'POST',
-      body: { votedParticipantId: battleVote.value },
+      body,
     })
     battleVoteSubmitted.value = true
     battleVoteResult.value = result
@@ -552,5 +563,10 @@ function phaseColor(phase: string | undefined) {
     completed: 'success',
   }
   return (map[phase || 'idle'] || 'neutral') as any
+}
+
+function formatPhase(phase: string | undefined): string {
+  if (!phase || phase === 'idle') return 'not started'
+  return phase
 }
 </script>

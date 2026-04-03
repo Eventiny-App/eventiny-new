@@ -54,7 +54,7 @@
                       {{ r.themeScores?.find((t: any) => t.themeId === theme.id)?.average?.toFixed(2) || '—' }}
                     </td>
                     <td v-for="js in r.judgeScores" :key="js.judgeId" class="py-2 px-3 text-right text-xs">
-                      {{ js.score !== null && js.score !== undefined ? (js.score?.toFixed ? js.score.toFixed(1) : js.averageScore?.toFixed(1)) : '—' }}
+                      {{ (js.score ?? js.averageScore) != null ? (js.score ?? js.averageScore).toFixed(1) : '—' }}
                     </td>
                   </tr>
                 </template>

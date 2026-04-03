@@ -31,7 +31,7 @@
                 <span class="font-medium text-lg">{{ cat.name }}</span>
                 <span class="text-xs text-gray-500 uppercase tracking-wide">{{ cat.type === 'battle' ? 'Versus' : 'Choreographic' }}</span>
                 <UBadge v-if="cat.categoryState?.phase && cat.categoryState.phase !== 'idle'" :color="phaseColor(cat.categoryState.phase)" variant="outline">
-                  {{ cat.categoryState.phase }}
+                  {{ formatPhase(cat.categoryState.phase) }}
                 </UBadge>
               </div>
 
@@ -267,5 +267,10 @@ function phaseColor(phase?: string) {
     playoffs: 'primary', battles: 'error', completed: 'success',
   }
   return (map[phase || 'idle'] || 'neutral') as any
+}
+
+function formatPhase(phase: string | undefined): string {
+  if (!phase || phase === 'idle') return 'not started'
+  return phase
 }
 </script>

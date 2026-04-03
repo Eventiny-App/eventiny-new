@@ -6,11 +6,13 @@ export default defineEventHandler(async (event) => {
 
   const query = getQuery(event)
   const search = typeof query.search === 'string' ? query.search.trim() : ''
+  const categoryId = typeof query.categoryId === 'string' ? query.categoryId.trim() : ''
 
   const participants = await prisma.participant.findMany({
     where: {
       eventId,
       ...(search ? { name: { contains: search } } : {}),
+      ...(categoryId ? { participantCategories: { some: { categoryId } } } : {}),
     },
     include: {
       participantCategories: {

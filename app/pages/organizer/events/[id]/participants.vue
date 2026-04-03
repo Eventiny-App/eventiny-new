@@ -7,9 +7,14 @@
 
     <div class="max-w-4xl mx-auto p-4 sm:p-6 space-y-6">
       <div class="flex items-center justify-between flex-wrap gap-3">
-        <div class="flex-1 min-w-[200px]">
+        <div class="flex-1 min-w-[200px] space-y-2">
           <UInput v-model="searchQuery" placeholder="Search by name…" icon="i-lucide-search" class="w-full" />
-          <p class="text-xs text-gray-500 mt-1">{{ filteredParticipants.length }} participant{{ filteredParticipants.length === 1 ? '' : 's' }} found</p>
+          <USelect
+            v-model="selectedCategoryFilter"
+            :items="categoryFilterOptions"
+            class="w-full"
+          />
+          <p class="text-xs text-gray-500">{{ filteredParticipants.length }} participant{{ filteredParticipants.length === 1 ? '' : 's' }}{{ selectedCategoryFilter ? ' in this category' : ' found' }}</p>
         </div>
         <UButton icon="i-lucide-plus" @click="openCreate" class="cursor-pointer shrink-0">
           Register Participant
@@ -18,7 +23,7 @@
 
       <UCard v-if="filteredParticipants.length === 0 && !loading">
         <div class="text-center py-6">
-          <p class="text-gray-400">{{ searchQuery ? 'No participants match your search.' : 'No participants registered yet.' }}</p>
+          <p class="text-gray-400">{{ searchQuery || selectedCategoryFilter ? 'No participants match your filters.' : 'No participants registered yet.' }}</p>
         </div>
       </UCard>
 
@@ -74,7 +79,7 @@
                     />
                     <span class="text-sm" :class="{ 'opacity-50': isEditing && editingOriginalCatIds.includes(cat.id) && getPhase(cat.id) !== 'idle' }">{{ cat.name }}</span>
                     <UBadge :color="cat.type === 'battle' ? 'error' : 'info'" variant="subtle" size="xs">{{ cat.type }}</UBadge>
-                    <UBadge v-if="getPhase(cat.id) !== 'idle'" variant="outline" size="xs">{{ getPhase(cat.id) }}</UBadge>
+                    <UBadge v-if="getPhase(cat.id) !== 'idle'" variant="outline" size="xs">{{ formatPhase(getPhase(cat.id)) }}</UBadge>
                     <span v-if="isEditing && editingOriginalCatIds.includes(cat.id) && getPhase(cat.id) !== 'idle'" class="text-xs text-yellow-400">locked</span>
                   </div>
                   <p v-if="categories.length === 0" class="text-xs text-gray-500">No categories created yet.</p>
@@ -105,11 +110,28 @@ const participants = ref<any[]>([])
 const categories = ref<any[]>([])
 const loading = ref(true)
 const searchQuery = ref('')
+const selectedCategoryFilter = ref('')
+
+const categoryFilterOptions = computed(() => {
+  const opts = [{ label: 'All categories', value: '' }]
+  for (const cat of categories.value) {
+    opts.push({ label: cat.name, value: cat.id })
+  }
+  return opts
+})
 
 const filteredParticipants = computed(() => {
-  if (!searchQuery.value.trim()) return participants.value
-  const q = searchQuery.value.toLowerCase()
-  return participants.value.filter((p: any) => p.name.toLowerCase().includes(q))
+  let result = participants.value
+  if (searchQuery.value.trim()) {
+    const q = searchQuery.value.toLowerCase()
+    result = result.filter((p: any) => p.name.toLowerCase().includes(q))
+  }
+  if (selectedCategoryFilter.value) {
+    result = result.filter((p: any) =>
+      p.participantCategories.some((pc: any) => pc.category.id === selectedCategoryFilter.value && !pc.withdrawn)
+    )
+  }
+  return result
 })
 
 async function loadData() {
@@ -131,6 +153,11 @@ onMounted(() => loadData())
 function getPhase(categoryId: string): string {
   const cat = categories.value.find((c: any) => c.id === categoryId)
   return cat?.categoryState?.phase || 'idle'
+}
+
+function formatPhase(phase: string | undefined): string {
+  if (!phase || phase === 'idle') return 'not started'
+  return phase
 }
 
 // Form

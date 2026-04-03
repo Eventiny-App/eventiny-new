@@ -31,6 +31,17 @@ export default defineEventHandler(async (event) => {
   if (body.name !== undefined) {
     const nameResult = validateName(body.name)
     if (!nameResult.valid) throw createError({ statusCode: 400, statusMessage: nameResult.error })
+
+    // Check name uniqueness within event (case-insensitive), excluding current participant
+    const existingParticipants = await prisma.participant.findMany({
+      where: { eventId, id: { not: participantId } },
+      select: { name: true },
+    })
+    const lowerName = nameResult.sanitized.toLowerCase()
+    if (existingParticipants.some(p => p.name.toLowerCase() === lowerName)) {
+      throw createError({ statusCode: 409, statusMessage: 'A participant with this name already exists in this event.' })
+    }
+
     await prisma.participant.update({
       where: { id: participantId },
       data: { name: nameResult.sanitized },
