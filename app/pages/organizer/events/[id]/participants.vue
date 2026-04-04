@@ -14,7 +14,7 @@
             :items="categoryFilterOptions"
             class="w-full"
           />
-          <p class="text-xs text-gray-500">{{ filteredParticipants.length }} participant{{ filteredParticipants.length === 1 ? '' : 's' }}{{ selectedCategoryFilter ? ' in this category' : ' found' }}</p>
+          <p class="text-xs text-gray-500">{{ filteredParticipants.length }} participant{{ filteredParticipants.length === 1 ? '' : 's' }}{{ selectedCategoryFilter !== 'all' ? ' in this category' : ' found' }}</p>
         </div>
         <UButton icon="i-lucide-plus" @click="openCreate" class="cursor-pointer shrink-0">
           Register Participant
@@ -23,7 +23,7 @@
 
       <UCard v-if="filteredParticipants.length === 0 && !loading">
         <div class="text-center py-6">
-          <p class="text-gray-400">{{ searchQuery || selectedCategoryFilter ? 'No participants match your filters.' : 'No participants registered yet.' }}</p>
+          <p class="text-gray-400">{{ searchQuery || selectedCategoryFilter !== 'all' ? 'No participants match your filters.' : 'No participants registered yet.' }}</p>
         </div>
       </UCard>
 
@@ -110,10 +110,10 @@ const participants = ref<any[]>([])
 const categories = ref<any[]>([])
 const loading = ref(true)
 const searchQuery = ref('')
-const selectedCategoryFilter = ref('')
+const selectedCategoryFilter = ref('all')
 
 const categoryFilterOptions = computed(() => {
-  const opts = [{ label: 'All categories', value: '' }]
+  const opts = [{ label: 'All categories', value: 'all' }]
   for (const cat of categories.value) {
     opts.push({ label: cat.name, value: cat.id })
   }
@@ -126,7 +126,7 @@ const filteredParticipants = computed(() => {
     const q = searchQuery.value.toLowerCase()
     result = result.filter((p: any) => p.name.toLowerCase().includes(q))
   }
-  if (selectedCategoryFilter.value) {
+  if (selectedCategoryFilter.value && selectedCategoryFilter.value !== 'all') {
     result = result.filter((p: any) =>
       p.participantCategories.some((pc: any) => pc.category.id === selectedCategoryFilter.value && !pc.withdrawn)
     )
