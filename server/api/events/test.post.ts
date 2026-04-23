@@ -136,30 +136,18 @@ export default defineEventHandler(async (event) => {
     const choreoNames   = allNames.slice(cursor, cursor += body.choreoCount)
 
     // Create participants and collect their IDs grouped by category
-    const hipHopParticipants = await Promise.all(
-      hipHopNames.map(name =>
-        tx.participant.create({
-          data: { eventId: newEvent.id, name },
-          select: { id: true },
-        })
-      )
-    )
-    const breakingParticipants = await Promise.all(
-      breakingNames.map(name =>
-        tx.participant.create({
-          data: { eventId: newEvent.id, name },
-          select: { id: true },
-        })
-      )
-    )
-    const choreoParticipants = await Promise.all(
-      choreoNames.map(name =>
-        tx.participant.create({
-          data: { eventId: newEvent.id, name },
-          select: { id: true },
-        })
-      )
-    )
+    const hipHopParticipants = await tx.participant.createManyAndReturn({
+      data: hipHopNames.map(name => ({ eventId: newEvent.id, name })),
+      select: { id: true },
+    })
+    const breakingParticipants = await tx.participant.createManyAndReturn({
+      data: breakingNames.map(name => ({ eventId: newEvent.id, name })),
+      select: { id: true },
+    })
+    const choreoParticipants = await tx.participant.createManyAndReturn({
+      data: choreoNames.map(name => ({ eventId: newEvent.id, name })),
+      select: { id: true },
+    })
 
     // 6. ParticipantCategory joins
     await tx.participantCategory.createMany({
@@ -178,14 +166,10 @@ export default defineEventHandler(async (event) => {
       { name: 'Link',        accessPin: '1004' },
       { name: 'Jimmy Yudat', accessPin: '1005' },
     ]
-    const judges = await Promise.all(
-      judgeData.map(d =>
-        tx.judge.create({
-          data: { eventId: newEvent.id, name: d.name, accessPin: d.accessPin },
-          select: { id: true, name: true },
-        })
-      )
-    )
+    const judges = await tx.judge.createManyAndReturn({
+      data: judgeData.map(d => ({ eventId: newEvent.id, name: d.name, accessPin: d.accessPin })),
+      select: { id: true, name: true },
+    })
     const [josephGo, kris, mamson, link, jimmyYudat] = judges as [typeof judges[0], typeof judges[0], typeof judges[0], typeof judges[0], typeof judges[0]]
 
     // 8. JudgeCategory assignments:
