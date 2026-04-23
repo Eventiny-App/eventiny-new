@@ -67,8 +67,8 @@
         <UButton block variant="soft" icon="i-lucide-mic" @click="navigateTo(`/organizer/events/${eventId}/hosts`)" class="cursor-pointer">
           Hosts
         </UButton>
-        <UButton block variant="soft" color="success" icon="i-lucide-download" :loading="exporting" @click="exportResults" class="cursor-pointer">
-          Export
+        <UButton block variant="soft" color="success" icon="i-lucide-file-text" :loading="exporting" @click="exportResults" class="cursor-pointer">
+          Export PDF
         </UButton>
       </div>
 
@@ -219,14 +219,9 @@ const exporting = ref(false)
 async function exportResults() {
   exporting.value = true
   try {
-    const csv = await $fetch<string>(`/api/events/${eventId}/export`, { responseType: 'text' })
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${eventData.value?.name || 'event'}-export.csv`
-    a.click()
-    URL.revokeObjectURL(url)
+    const data = await $fetch(`/api/events/${eventId}/export`)
+    const { generatePdf } = await import('~/utils/generatePdf')
+    generatePdf(data as any)
   } finally {
     exporting.value = false
   }

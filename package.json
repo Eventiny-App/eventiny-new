@@ -18,6 +18,8 @@
     "@vite-pwa/nuxt": "^0.10",
     "bcryptjs": "^2.4.3",
     "jsonwebtoken": "^9.0.2",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.7",
     "nuxt": "^3.17",
     "zod": "^3.24"
   },

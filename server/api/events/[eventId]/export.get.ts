@@ -1,8 +1,41 @@
 /**
  * GET /api/events/:eventId/export
- * Exports all event data as CSV: rankings, per-judge scores, and bracket results for each category.
- * Returns a multi-section CSV file.
+ * Returns structured JSON with rankings, per-judge/theme scores, and bracket results per category.
+ * Intended for client-side PDF generation.
  */
+
+export interface ExportRankingRow {
+  rank: number
+  name: string
+  average: number
+  judgeScores?: Record<string, number | null>
+  themeAvgs?: Record<string, number>
+}
+
+export interface ExportBracketRow {
+  round: number
+  position: number
+  p1: string
+  p2: string
+  winner: string
+}
+
+export interface ExportCategory {
+  name: string
+  type: string
+  phase: string
+  judgeNames: string[]
+  themes: string[]
+  ranking: ExportRankingRow[]
+  bracket: ExportBracketRow[]
+}
+
+export interface ExportPayload {
+  eventName: string
+  exportedAt: string
+  categories: ExportCategory[]
+}
+
 export default defineEventHandler(async (event) => {
   const { eventId } = event.context.params as { eventId: string }
   await requireAuth(event, 'superadmin', 'organizer')
@@ -32,80 +65,51 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, statusMessage: 'Event not found' })
   }
 
-  const lines: string[] = []
-
-  function escapeCsv(val: string | number | null | undefined): string {
-    if (val === null || val === undefined) return ''
-    const s = String(val)
-    if (s.includes(',') || s.includes('"') || s.includes('\n')) {
-      return '"' + s.replace(/"/g, '""') + '"'
-    }
-    return s
-  }
-
-  function addRow(...cells: (string | number | null | undefined)[]) {
-    lines.push(cells.map(escapeCsv).join(','))
-  }
-
-  // Event header
-  addRow('Event', eventData.name)
-  addRow('Exported', new Date().toISOString())
-  addRow()
+  const categories: ExportCategory[] = []
 
   for (const category of eventData.categories) {
     const participants = category.participantCategories.map(pc => pc.participant)
     const judges = category.judgeCategories
+    const judgeNames = judges.map(jc => jc.judge.name)
+    const themes = category.choreoThemes
+    const phase = category.categoryState?.phase || 'idle'
 
-    addRow('---')
-    addRow('Category', category.name)
-    addRow('Type', category.type)
-    addRow('Phase', category.categoryState?.phase || 'idle')
-    addRow()
+    let ranking: ExportRankingRow[] = []
+    const themeNames: string[] = []
 
-    // ── Preselection / ranking ──
-    if (category.type === 'battle' || (category.type === 'choreo' && category.choreoThemes.length === 0)) {
+    // ── Preselection ranking ──
+    if (category.type === 'battle' || (category.type === 'choreo' && themes.length === 0)) {
       const votes = await prisma.preselectionVote.findMany({
         where: { categoryId: category.id },
       })
 
-      // Build ranking
-      const ranking = participants.map(p => {
+      const rows = participants.map(p => {
         const pVotes = votes.filter(v => v.participantId === p.id)
-        const totalScore = pVotes.reduce((sum, v) => sum + v.score, 0)
-        const judgeCount = pVotes.length
-        const average = judgeCount > 0 ? totalScore / judgeCount : 0
-
-        const judgeScoreMap: Record<string, number | null> = {}
+        const average = pVotes.length > 0
+          ? Math.round((pVotes.reduce((sum, v) => sum + v.score, 0) / pVotes.length) * 100) / 100
+          : 0
+        const judgeScores: Record<string, number | null> = {}
         for (const jc of judges) {
           const vote = pVotes.find(v => v.judgeId === jc.judgeId)
-          judgeScoreMap[jc.judge.name] = vote ? vote.score : null
+          judgeScores[jc.judge.name] = vote ? vote.score : null
         }
-
-        return { name: p.name, average: Math.round(average * 100) / 100, judgeScoreMap }
+        return { name: p.name, average, judgeScores }
       })
 
-      ranking.sort((a, b) => b.average - a.average)
-
-      // Header row
-      const judgeNames = judges.map(jc => jc.judge.name)
-      addRow('Rank', 'Participant', 'Average', ...judgeNames)
-
-      // Data rows
-      ranking.forEach((r, i) => {
-        addRow(i + 1, r.name, r.average, ...judgeNames.map(jn => r.judgeScoreMap[jn]))
-      })
+      rows.sort((a, b) => b.average - a.average)
+      ranking = rows.map((r, i) => ({ rank: i + 1, name: r.name, average: r.average, judgeScores: r.judgeScores }))
     } else {
-      // Choreo — per-theme scores
+      // Choreo with themes
       const votes = await prisma.choreoVote.findMany({
         where: { categoryId: category.id },
       })
 
-      const themes = category.choreoThemes
+      for (const t of themes) themeNames.push(t.name)
 
-      const ranking = participants.map(p => {
+      const rows = participants.map(p => {
         const pVotes = votes.filter(v => v.participantId === p.id)
-
         const themeAvgs: Record<string, number> = {}
+
         for (const theme of themes) {
           const themeVotes = pVotes.filter(v => v.themeId === theme.id)
           themeAvgs[theme.name] = themeVotes.length > 0
@@ -120,17 +124,9 @@ export default defineEventHandler(async (event) => {
         return { name: p.name, average: overallAvg, themeAvgs }
       })
 
-      ranking.sort((a, b) => b.average - a.average)
-
-      const themeNames = themes.map(t => t.name)
-      addRow('Rank', 'Participant', 'Overall Avg', ...themeNames)
-
-      ranking.forEach((r, i) => {
-        addRow(i + 1, r.name, r.average, ...themeNames.map(tn => r.themeAvgs[tn]))
-      })
+      rows.sort((a, b) => b.average - a.average)
+      ranking = rows.map((r, i) => ({ rank: i + 1, name: r.name, average: r.average, themeAvgs: r.themeAvgs }))
     }
-
-    addRow()
 
     // ── Bracket results ──
     const matchups = await prisma.battleMatchup.findMany({
@@ -143,35 +139,32 @@ export default defineEventHandler(async (event) => {
       orderBy: [{ round: 'asc' }, { position: 'asc' }],
     })
 
-    if (matchups.length > 0) {
-      addRow('Versus Bracket')
-      addRow('Round', 'Position', 'Participant 1', 'Participant 2', 'Winner')
+    const bracket: ExportBracketRow[] = matchups
+      .filter(m => m.participant1 || m.participant2)
+      .map(m => ({
+        round: m.round,
+        position: m.position,
+        p1: m.participant1?.name || 'TBD',
+        p2: m.participant2?.name || 'TBD',
+        winner: m.winner?.name || '',
+      }))
 
-      for (const m of matchups) {
-        if (m.participant1 || m.participant2) {
-          addRow(
-            m.round,
-            m.position,
-            m.participant1?.name || 'TBD',
-            m.participant2?.name || 'TBD',
-            m.winner?.name || '',
-          )
-        }
-      }
-      addRow()
-    }
+    categories.push({
+      name: category.name,
+      type: category.type,
+      phase,
+      judgeNames,
+      themes: themeNames,
+      ranking,
+      bracket,
+    })
   }
 
-  // Return as CSV download
-  const csv = lines.join('\n')
-  setResponseHeaders(event, {
-    'Content-Type': 'text/csv; charset=utf-8',
-    'Content-Disposition': `attachment; filename="${sanitizeFilename(eventData.name)}-export.csv"`,
-  })
+  const payload: ExportPayload = {
+    eventName: eventData.name,
+    exportedAt: new Date().toISOString(),
+    categories,
+  }
 
-  return csv
+  return payload
 })
-
-function sanitizeFilename(name: string): string {
-  return name.replace(/[^a-zA-Z0-9_\- ]/g, '').replace(/\s+/g, '-').substring(0, 50) || 'event'
-}
