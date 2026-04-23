@@ -67,7 +67,7 @@
         <UButton block variant="soft" icon="i-lucide-mic" @click="navigateTo(`/organizer/events/${eventId}/hosts`)" class="cursor-pointer">
           Hosts
         </UButton>
-        <UButton block variant="soft" color="success" icon="i-lucide-file-text" :loading="exporting" @click="exportResults" class="cursor-pointer">
+        <UButton block variant="soft" color="success" icon="i-lucide-file-text" @click="exportModalOpen = true" class="cursor-pointer">
           Export PDF
         </UButton>
       </div>
@@ -107,6 +107,87 @@
           <div class="flex gap-2 justify-end mt-4">
             <UButton variant="ghost" @click="showDeleteConfirm = false" class="cursor-pointer">Cancel</UButton>
             <UButton color="error" :loading="deleting" :disabled="!deleteNameMatches" @click="handleDeleteEvent" class="cursor-pointer">Delete Event</UButton>
+          </div>
+        </UCard>
+      </template>
+    </UModal>
+
+    <!-- Export PDF Modal -->
+    <UModal v-model:open="exportModalOpen">
+      <template #content>
+        <UCard>
+          <template #header>
+            <h3 class="text-lg font-semibold">Export PDF</h3>
+          </template>
+
+          <div class="space-y-5">
+            <!-- Category selection -->
+            <div>
+              <p class="text-sm font-medium text-gray-300 mb-2">Categories to include</p>
+              <div class="space-y-2">
+                <label
+                  v-for="cat in exportCategories"
+                  :key="cat.id"
+                  class="flex items-start gap-3 cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    :value="cat.id"
+                    v-model="selectedCategoryIds"
+                    class="mt-0.5 accent-blue-500"
+                  />
+                  <div>
+                    <span class="text-sm text-white">{{ cat.name }}</span>
+                    <span class="text-xs text-gray-400 ml-2">({{ cat.type }} · {{ cat.categoryState?.phase || 'idle' }})</span>
+                    <p v-if="(cat.categoryState?.phase || 'idle') === 'idle' && selectedCategoryIds.includes(cat.id)" class="text-xs text-amber-400 mt-0.5">
+                      ⚠ Preselection will be started for this category to generate participant numbers.
+                    </p>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <!-- Content toggle -->
+            <div>
+              <p class="text-sm font-medium text-gray-300 mb-2">Content</p>
+              <div class="space-y-2">
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="radio" v-model="exportContent" value="votes" class="accent-blue-500" />
+                  <span class="text-sm text-white">Participant list + votes <span class="text-gray-400">(scores may be blank)</span></span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="radio" v-model="exportContent" value="list" class="accent-blue-500" />
+                  <span class="text-sm text-white">Participant list only</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Choreo detail (only when votes mode + selected choreo-with-themes category exists) -->
+            <div v-if="exportContent === 'votes' && hasSelectedChoreoWithThemes">
+              <p class="text-sm font-medium text-gray-300 mb-2">Choreo score detail</p>
+              <div class="space-y-2">
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="radio" v-model="choreoDetail" value="averaged" class="accent-blue-500" />
+                  <span class="text-sm text-white">Averaged scores per criteria</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="radio" v-model="choreoDetail" value="full" class="accent-blue-500" />
+                  <span class="text-sm text-white">Full detail — one table per judge</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex gap-2 justify-end mt-6">
+            <UButton variant="ghost" @click="exportModalOpen = false" class="cursor-pointer">Cancel</UButton>
+            <UButton
+              color="success"
+              icon="i-lucide-file-text"
+              :loading="exporting"
+              :disabled="selectedCategoryIds.length === 0"
+              @click="exportResults"
+              class="cursor-pointer"
+            >Export</UButton>
           </div>
         </UCard>
       </template>
@@ -214,14 +295,55 @@ function formatDate(d: string) {
 }
 
 // Export
+const exportModalOpen = ref(false)
 const exporting = ref(false)
+const exportCategories = ref<any[]>([])
+const selectedCategoryIds = ref<string[]>([])
+const exportContent = ref<'votes' | 'list'>('votes')
+const choreoDetail = ref<'averaged' | 'full'>('averaged')
+
+const hasSelectedChoreoWithThemes = computed(() =>
+  exportCategories.value.some(
+    cat => selectedCategoryIds.value.includes(cat.id) && cat.type === 'choreo' && cat.choreoThemes?.length > 0,
+  ),
+)
+
+async function loadExportCategories() {
+  exportCategories.value = await $fetch(`/api/events/${eventId}/categories`)
+  selectedCategoryIds.value = exportCategories.value.map((c: any) => c.id)
+}
+
+watch(exportModalOpen, (v) => {
+  if (v) loadExportCategories()
+})
 
 async function exportResults() {
   exporting.value = true
   try {
-    const data = await $fetch(`/api/events/${eventId}/export`)
+    // Start preselection for any IDLE categories in the selection
+    for (const catId of selectedCategoryIds.value) {
+      const cat = exportCategories.value.find((c: any) => c.id === catId)
+      if (cat && (cat.categoryState?.phase || 'idle') === 'idle') {
+        try {
+          await $fetch(`/api/events/${eventId}/categories/${catId}/state`, {
+            method: 'POST',
+            body: { action: 'start-preselection' },
+          })
+        } catch {
+          // skip this category if it has no participants or already started
+        }
+      }
+    }
+
+    const params = new URLSearchParams({
+      categories: selectedCategoryIds.value.join(','),
+      content: exportContent.value,
+      choreoDetail: choreoDetail.value,
+    })
+    const data = await $fetch(`/api/events/${eventId}/export?${params}`)
     const { generatePdf } = await import('~/utils/generatePdf')
-    generatePdf(data as any)
+    generatePdf(data as any, { content: exportContent.value, choreoDetail: choreoDetail.value })
+    exportModalOpen.value = false
   } finally {
     exporting.value = false
   }

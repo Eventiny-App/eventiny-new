@@ -1,6 +1,57 @@
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
-import type { ExportPayload } from '~/server/api/events/[eventId]/export.get'
+
+// ── Shared types (mirrored from server export.get.ts) ─────────────────────
+interface ExportRankingRow {
+  rank: number
+  name: string
+  average: number
+  judgeScores?: Record<string, number | null>
+  themeAvgs?: Record<string, number>
+}
+
+interface ExportBracketRow {
+  round: number
+  position: number
+  p1: string
+  p2: string
+  winner: string
+}
+
+interface ExportParticipantRow {
+  number: number
+  name: string
+}
+
+interface ExportJudgeDetailRow {
+  name: string
+  themeScores: Record<string, number | null>
+  average: number
+}
+
+interface ExportJudgeDetail {
+  judgeName: string
+  participants: ExportJudgeDetailRow[]
+}
+
+interface ExportCategory {
+  name: string
+  type: string
+  phase: string
+  judgeNames: string[]
+  themes: string[]
+  participants: ExportParticipantRow[]
+  ranking: ExportRankingRow[]
+  bracket: ExportBracketRow[]
+  judgeDetails: ExportJudgeDetail[]
+}
+
+interface ExportPayload {
+  eventName: string
+  exportedAt: string
+  content: 'votes' | 'list'
+  categories: ExportCategory[]
+}
 
 // ── Palette ──────────────────────────────────────────────────────────────────
 const DARK_NAVY = [30, 41, 59] as [number, number, number]      // #1e293b
@@ -12,6 +63,7 @@ const TEXT_MUTED = [100, 116, 139] as [number, number, number]  // #64748b
 const GOLD = [234, 179, 8] as [number, number, number]          // #eab308 — rank 1
 const SILVER = [148, 163, 184] as [number, number, number]      // #94a3b8 — rank 2
 const BRONZE = [180, 120, 60] as [number, number, number]       // warm brown — rank 3
+const JUDGE_HEADER = [45, 60, 84] as [number, number, number]   // slightly lighter navy for score cols
 
 function rankColor(rank: number): [number, number, number] {
   if (rank === 1) return GOLD
@@ -33,7 +85,12 @@ function sanitizeFilename(name: string): string {
   return name.replace(/[^a-zA-Z0-9_\- ]/g, '').replace(/\s+/g, '-').substring(0, 50) || 'event'
 }
 
-export function generatePdf(data: ExportPayload): void {
+export interface PdfOptions {
+  content: 'votes' | 'list'
+  choreoDetail: 'averaged' | 'full'
+}
+
+export function generatePdf(data: ExportPayload, options: PdfOptions): void {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const pageW = doc.internal.pageSize.getWidth()
   const pageH = doc.internal.pageSize.getHeight()
@@ -41,11 +98,11 @@ export function generatePdf(data: ExportPayload): void {
   const marginR = 14
   const contentW = pageW - marginL - marginR
 
-  let pageCount = 1
+  const isListMode = options.content === 'list'
+  const isFullDetail = options.choreoDetail === 'full'
 
-  // ── Page header/footer via addPage hook ───────────────────────────────────
+  // ── Page header/footer ────────────────────────────────────────────────────
   function drawPageFrame() {
-    // Top bar
     doc.setFillColor(...DARK_NAVY)
     doc.rect(0, 0, pageW, 12, 'F')
     doc.setFont('helvetica', 'bold')
@@ -56,7 +113,6 @@ export function generatePdf(data: ExportPayload): void {
     doc.setTextColor(...TEXT_MUTED)
     doc.text(`Exported ${formatDate(data.exportedAt)}`, pageW - marginR, 8, { align: 'right' })
 
-    // Bottom bar
     doc.setFillColor(...DARK_NAVY)
     doc.rect(0, pageH - 10, pageW, 10, 'F')
     doc.setFont('helvetica', 'normal')
@@ -66,7 +122,6 @@ export function generatePdf(data: ExportPayload): void {
   }
 
   // ── Cover page ────────────────────────────────────────────────────────────
-  // Full dark header block
   doc.setFillColor(...DARK_NAVY)
   doc.rect(0, 0, pageW, 60, 'F')
 
@@ -78,13 +133,13 @@ export function generatePdf(data: ExportPayload): void {
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(11)
   doc.setTextColor(...ACCENT_BLUE)
-  doc.text('Results Export', pageW / 2, 44, { align: 'center' })
+  doc.text(isListMode ? 'Participant List' : 'Results Export', pageW / 2, 44, { align: 'center' })
 
   doc.setFontSize(9)
   doc.setTextColor(...TEXT_MUTED)
   doc.text(`Exported on ${formatDate(data.exportedAt)}`, pageW / 2, 52, { align: 'center' })
 
-  // Summary block
+  // Category summary
   let cy = 74
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(10)
@@ -100,7 +155,7 @@ export function generatePdf(data: ExportPayload): void {
     cy += 5.5
   }
 
-  // Bottom bar on cover
+  // Cover bottom bar
   doc.setFillColor(...DARK_NAVY)
   doc.rect(0, pageH - 10, pageW, 10, 'F')
   doc.setFont('helvetica', 'normal')
@@ -111,7 +166,6 @@ export function generatePdf(data: ExportPayload): void {
   // ── Category pages ────────────────────────────────────────────────────────
   for (const cat of data.categories) {
     doc.addPage()
-    pageCount++
     drawPageFrame()
 
     let y = 18
@@ -123,91 +177,201 @@ export function generatePdf(data: ExportPayload): void {
     doc.setFontSize(13)
     doc.setTextColor(...WHITE)
     doc.text(cat.name.toUpperCase(), marginL + 4, y + 7.5)
-
-    // Type + phase pill (right side of banner)
-    const pillText = `${cat.type.toUpperCase()}  ·  ${formatPhase(cat.phase)}`
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(8)
-    doc.text(pillText, pageW - marginR - 4, y + 7.5, { align: 'right' })
-
+    doc.text(`${cat.type.toUpperCase()}  ·  ${formatPhase(cat.phase)}`, pageW - marginR - 4, y + 7.5, { align: 'right' })
     y += 17
 
-    // ── Rankings table ────────────────────────────────────────────────────
-    if (cat.ranking.length > 0) {
+    // ── LIST MODE ─────────────────────────────────────────────────────────
+    if (isListMode) {
       doc.setFont('helvetica', 'bold')
       doc.setFontSize(9)
       doc.setTextColor(...TEXT_DARK)
-      doc.text(cat.themes.length > 0 ? 'CHOREO RANKING' : 'PRESELECTION RANKING', marginL, y)
+      doc.text('PARTICIPANT LIST', marginL, y)
       y += 4
 
-      const scoreColumns = cat.themes.length > 0 ? cat.themes : cat.judgeNames
-      const scoreLabel = cat.themes.length > 0 ? 'Theme' : 'Judge'
-
-      const head = [['#', 'Participant', 'Avg', ...scoreColumns.map(s => s)]]
-      const body = cat.ranking.map(row => {
-        const scores = scoreColumns.map(col => {
-          const val = cat.themes.length > 0
-            ? (row.themeAvgs?.[col] ?? 0)
-            : (row.judgeScores?.[col] ?? '-')
-          return val === null ? '-' : String(val)
+      if (cat.participants.length === 0) {
+        doc.setFont('helvetica', 'italic')
+        doc.setFontSize(8.5)
+        doc.setTextColor(...TEXT_MUTED)
+        doc.text('No participants registered.', marginL, y + 6)
+      } else {
+        autoTable(doc, {
+          startY: y,
+          head: [['#', 'Participant']],
+          body: cat.participants.map((p: ExportParticipantRow) => [String(p.number), p.name]),
+          margin: { left: marginL, right: marginR },
+          styles: {
+            font: 'helvetica',
+            fontSize: 9,
+            cellPadding: { top: 3, bottom: 3, left: 4, right: 4 },
+            textColor: TEXT_DARK,
+            lineColor: [226, 232, 240],
+            lineWidth: 0.2,
+          },
+          headStyles: { fillColor: DARK_NAVY, textColor: WHITE, fontStyle: 'bold', fontSize: 8.5 },
+          alternateRowStyles: { fillColor: LIGHT_ROW },
+          columnStyles: {
+            0: { halign: 'center', fontStyle: 'bold', cellWidth: 14 },
+          },
+          didDrawPage() { drawPageFrame() },
         })
-        return [String(row.rank), row.name, String(row.average), ...scores]
-      })
+      }
+      continue
+    }
 
-      autoTable(doc, {
-        startY: y,
-        head,
-        body,
-        margin: { left: marginL, right: marginR },
-        styles: {
-          font: 'helvetica',
-          fontSize: 8.5,
-          cellPadding: { top: 2.5, bottom: 2.5, left: 3, right: 3 },
-          textColor: TEXT_DARK,
-          lineColor: [226, 232, 240],
-          lineWidth: 0.2,
-        },
-        headStyles: {
-          fillColor: DARK_NAVY,
-          textColor: WHITE,
-          fontStyle: 'bold',
-          fontSize: 8,
-        },
-        alternateRowStyles: {
-          fillColor: LIGHT_ROW,
-        },
-        columnStyles: {
-          0: {
-            halign: 'center',
-            fontStyle: 'bold',
-            cellWidth: 10,
+    // ── VOTES MODE ────────────────────────────────────────────────────────
+
+    // Averaged or Full Detail choreo
+    const isChoreoFull = isFullDetail && cat.themes.length > 0
+
+    if (cat.ranking.length > 0) {
+      const rankingLabel = cat.themes.length > 0 ? 'CHOREO RANKING' : 'PRESELECTION RANKING'
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(9)
+      doc.setTextColor(...TEXT_DARK)
+      doc.text(rankingLabel, marginL, y)
+      y += 4
+
+      if (isChoreoFull) {
+        // Summary table: rank | name | overall avg only (compact)
+        autoTable(doc, {
+          startY: y,
+          head: [['#', 'Participant', 'Overall Avg']],
+          body: cat.ranking.map((row: ExportRankingRow) => [String(row.rank), row.name, String(row.average)]),
+          margin: { left: marginL, right: marginR },
+          tableWidth: 100,
+          styles: {
+            font: 'helvetica',
+            fontSize: 8.5,
+            cellPadding: { top: 2.5, bottom: 2.5, left: 3, right: 3 },
+            textColor: TEXT_DARK,
+            lineColor: [226, 232, 240],
+            lineWidth: 0.2,
           },
-          2: {
-            halign: 'center',
-            fontStyle: 'bold',
-            cellWidth: 18,
+          headStyles: { fillColor: DARK_NAVY, textColor: WHITE, fontStyle: 'bold', fontSize: 8 },
+          alternateRowStyles: { fillColor: LIGHT_ROW },
+          columnStyles: {
+            0: { halign: 'center', fontStyle: 'bold', cellWidth: 10 },
+            2: { halign: 'center', fontStyle: 'bold', cellWidth: 24 },
           },
-        },
-        didParseCell(hookData) {
-          // Rank column: colorize top 3
-          if (hookData.section === 'body' && hookData.column.index === 0) {
-            const rank = parseInt(hookData.cell.raw as string)
-            if (rank <= 3) {
-              hookData.cell.styles.textColor = rankColor(rank)
-              hookData.cell.styles.fontStyle = 'bold'
+          didParseCell(hookData) {
+            if (hookData.section === 'body' && hookData.column.index === 0) {
+              const rank = parseInt(hookData.cell.raw as string)
+              if (rank <= 3) {
+                hookData.cell.styles.textColor = rankColor(rank)
+                hookData.cell.styles.fontStyle = 'bold'
+              }
             }
-          }
-          // Score columns header: label them as judge/theme scores
-          if (hookData.section === 'head' && hookData.column.index >= 3) {
-            hookData.cell.styles.fillColor = [45, 60, 84]
-          }
-        },
-        didDrawPage() {
-          drawPageFrame()
-        },
-      })
+          },
+          didDrawPage() { drawPageFrame() },
+        })
 
-      y = (doc as any).lastAutoTable.finalY + 8
+        y = (doc as any).lastAutoTable.finalY + 10
+
+        // Per-judge sub-tables
+        for (const judgeDetail of cat.judgeDetails) {
+          if (y > pageH - 60) {
+            doc.addPage()
+            drawPageFrame()
+            y = 18
+          }
+
+          // Judge label bar
+          doc.setFillColor(...JUDGE_HEADER)
+          doc.rect(marginL, y, contentW, 8, 'F')
+          doc.setFont('helvetica', 'bold')
+          doc.setFontSize(8)
+          doc.setTextColor(...WHITE)
+          doc.text(`JUDGE: ${judgeDetail.judgeName.toUpperCase()}`, marginL + 3, y + 5.5)
+          y += 10
+
+          const themeHead = ['Participant', ...cat.themes, 'Avg']
+          const themeBody = judgeDetail.participants.map((p: ExportJudgeDetailRow) => [
+            p.name,
+            ...cat.themes.map((t: string) => p.themeScores[t] !== null && p.themeScores[t] !== undefined ? String(p.themeScores[t]) : '—'),
+            String(p.average),
+          ])
+
+          autoTable(doc, {
+            startY: y,
+            head: [themeHead],
+            body: themeBody,
+            margin: { left: marginL, right: marginR },
+            styles: {
+              font: 'helvetica',
+              fontSize: 8,
+              cellPadding: { top: 2, bottom: 2, left: 3, right: 3 },
+              textColor: TEXT_DARK,
+              lineColor: [226, 232, 240],
+              lineWidth: 0.2,
+            },
+            headStyles: { fillColor: DARK_NAVY, textColor: WHITE, fontStyle: 'bold', fontSize: 7.5 },
+            alternateRowStyles: { fillColor: LIGHT_ROW },
+            columnStyles: {
+              0: { cellWidth: 'auto' },
+              [themeHead.length - 1]: { halign: 'center', fontStyle: 'bold', cellWidth: 18 },
+            },
+            didParseCell(hookData) {
+              if (hookData.section === 'head' && hookData.column.index >= 1 && hookData.column.index < themeHead.length - 1) {
+                hookData.cell.styles.fillColor = JUDGE_HEADER
+              }
+            },
+            didDrawPage() { drawPageFrame() },
+          })
+
+          y = (doc as any).lastAutoTable.finalY + 8
+        }
+      } else {
+        // Averaged mode (default)
+        const scoreColumns = cat.themes.length > 0 ? cat.themes : cat.judgeNames
+        const head = [['#', 'Participant', 'Avg', ...scoreColumns]]
+        const body = cat.ranking.map((row: ExportRankingRow) => {
+          const scores = scoreColumns.map((col: string) => {
+            const val = cat.themes.length > 0
+              ? (row.themeAvgs?.[col] ?? 0)
+              : (row.judgeScores?.[col] ?? '-')
+            return val === null ? '-' : String(val)
+          })
+          return [String(row.rank), row.name, String(row.average), ...scores]
+        })
+
+        autoTable(doc, {
+          startY: y,
+          head,
+          body,
+          margin: { left: marginL, right: marginR },
+          styles: {
+            font: 'helvetica',
+            fontSize: 8.5,
+            cellPadding: { top: 2.5, bottom: 2.5, left: 3, right: 3 },
+            textColor: TEXT_DARK,
+            lineColor: [226, 232, 240],
+            lineWidth: 0.2,
+          },
+          headStyles: { fillColor: DARK_NAVY, textColor: WHITE, fontStyle: 'bold', fontSize: 8 },
+          alternateRowStyles: { fillColor: LIGHT_ROW },
+          columnStyles: {
+            0: { halign: 'center', fontStyle: 'bold', cellWidth: 10 },
+            2: { halign: 'center', fontStyle: 'bold', cellWidth: 18 },
+          },
+          didParseCell(hookData) {
+            if (hookData.section === 'body' && hookData.column.index === 0) {
+              const rank = parseInt(hookData.cell.raw as string)
+              if (rank <= 3) {
+                hookData.cell.styles.textColor = rankColor(rank)
+                hookData.cell.styles.fontStyle = 'bold'
+              }
+            }
+            if (hookData.section === 'head' && hookData.column.index >= 3) {
+              hookData.cell.styles.fillColor = JUDGE_HEADER
+            }
+          },
+          didDrawPage() { drawPageFrame() },
+        })
+
+        y = (doc as any).lastAutoTable.finalY + 8
+      }
     } else {
       doc.setFont('helvetica', 'italic')
       doc.setFontSize(8.5)
@@ -218,10 +382,8 @@ export function generatePdf(data: ExportPayload): void {
 
     // ── Bracket results ───────────────────────────────────────────────────
     if (cat.bracket.length > 0) {
-      // Check if we need a new page
       if (y > pageH - 60) {
         doc.addPage()
-        pageCount++
         drawPageFrame()
         y = 18
       }
@@ -232,21 +394,16 @@ export function generatePdf(data: ExportPayload): void {
       doc.text('BATTLE BRACKET', marginL, y)
       y += 4
 
-      const rounds = [...new Set(cat.bracket.map(b => b.round))].sort((a, b) => a - b)
-
-      const bracketHead = [['Round', 'Match', 'Participant 1', 'Participant 2', 'Winner']]
-      const bracketBody = cat.bracket.map(row => [
-        `Round ${row.round}`,
-        `#${row.position}`,
-        row.p1,
-        row.p2,
-        row.winner || '—',
-      ])
-
       autoTable(doc, {
         startY: y,
-        head: bracketHead,
-        body: bracketBody,
+        head: [['Round', 'Match', 'Participant 1', 'Participant 2', 'Winner']],
+        body: cat.bracket.map((row: ExportBracketRow) => [
+          `Round ${row.round}`,
+          `#${row.position}`,
+          row.p1,
+          row.p2,
+          row.winner || '—',
+        ]),
         margin: { left: marginL, right: marginR },
         styles: {
           font: 'helvetica',
@@ -256,37 +413,25 @@ export function generatePdf(data: ExportPayload): void {
           lineColor: [226, 232, 240],
           lineWidth: 0.2,
         },
-        headStyles: {
-          fillColor: DARK_NAVY,
-          textColor: WHITE,
-          fontStyle: 'bold',
-          fontSize: 8,
-        },
-        alternateRowStyles: {
-          fillColor: LIGHT_ROW,
-        },
+        headStyles: { fillColor: DARK_NAVY, textColor: WHITE, fontStyle: 'bold', fontSize: 8 },
+        alternateRowStyles: { fillColor: LIGHT_ROW },
         columnStyles: {
           0: { cellWidth: 22 },
           1: { cellWidth: 16, halign: 'center' },
-          4: { fontStyle: 'bold', textColor: ACCENT_BLUE },
+          4: { fontStyle: 'bold' },
         },
         didParseCell(hookData) {
-          // Highlight winner cell
           if (hookData.section === 'body' && hookData.column.index === 4 && hookData.cell.raw && hookData.cell.raw !== '—') {
             hookData.cell.styles.textColor = ACCENT_BLUE
             hookData.cell.styles.fontStyle = 'bold'
           }
-          // Group rows by round — slightly different shade per round
           if (hookData.section === 'body') {
-            const round = parseInt((hookData.row.raw as string[])[0].replace('Round ', ''))
-            if (round % 2 === 0) {
-              hookData.cell.styles.fillColor = [235, 242, 252]
-            }
+            const rawRow = hookData.row.raw as string[] | undefined
+            const round = rawRow?.[0] ? parseInt(rawRow[0].replace('Round ', '')) : 0
+            if (round % 2 === 0) hookData.cell.styles.fillColor = [235, 242, 252]
           }
         },
-        didDrawPage() {
-          drawPageFrame()
-        },
+        didDrawPage() { drawPageFrame() },
       })
     }
   }
@@ -303,3 +448,4 @@ export function generatePdf(data: ExportPayload): void {
 
   doc.save(`${sanitizeFilename(data.eventName)}-export.pdf`)
 }
+
