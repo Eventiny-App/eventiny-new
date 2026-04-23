@@ -24,7 +24,7 @@
         </div>
         <div class="flex items-center gap-2">
           <UTooltip text="Create test event">
-            <UButton icon="i-lucide-flask-conical" variant="ghost" size="sm" color="neutral" @click="openTestCreate" class="cursor-pointer" />
+            <UButton icon="i-lucide-flask-conical" variant="outline" size="sm" color="neutral" @click="openTestCreate" class="cursor-pointer text-gray-400 border-gray-700 hover:border-gray-500" />
           </UTooltip>
           <UButton icon="i-lucide-plus" @click="showCreate = true" class="cursor-pointer">
             New Event
