@@ -22,9 +22,14 @@
             judges, hosts, and participants.
           </p>
         </div>
-        <UButton icon="i-lucide-plus" @click="showCreate = true" class="cursor-pointer">
-          New Event
-        </UButton>
+        <div class="flex items-center gap-2">
+          <UTooltip text="Create test event">
+            <UButton icon="i-lucide-flask-conical" variant="ghost" size="sm" color="neutral" @click="openTestCreate" class="cursor-pointer" />
+          </UTooltip>
+          <UButton icon="i-lucide-plus" @click="showCreate = true" class="cursor-pointer">
+            New Event
+          </UButton>
+        </div>
       </div>
 
       <!-- Events list -->
@@ -63,6 +68,52 @@
         </UCard>
       </div>
     </div>
+
+    <!-- Test Event Modal -->
+    <UModal v-model:open="showTestCreate">
+      <template #content>
+        <UCard>
+          <template #header>
+            <h3 class="text-lg font-semibold">Create Test Event</h3>
+            <p class="text-sm text-gray-400 mt-1">
+              Creates a pre-wired event with Hip Hop, Breaking, and Hip Hop Choreo categories,
+              5 judges, 1 host, and randomized participants.
+            </p>
+          </template>
+          <UForm :state="testForm" class="space-y-4" @submit="handleTestCreate">
+            <UFormField label="Event Name" name="name">
+              <UInput v-model="testForm.name" placeholder="Test Event" class="w-full" />
+            </UFormField>
+            <UFormField label="Start Date" name="startDate">
+              <UInput v-model="testForm.startDate" type="date" class="w-full" />
+            </UFormField>
+            <UFormField label="End Date" name="endDate">
+              <UInput v-model="testForm.endDate" type="date" class="w-full" />
+            </UFormField>
+            <div class="grid grid-cols-3 gap-3">
+              <UFormField label="Hip Hop" name="hipHopCount">
+                <UInput v-model.number="testForm.hipHopCount" type="number" :min="1" :max="200" class="w-full" />
+              </UFormField>
+              <UFormField label="Breaking" name="breakingCount">
+                <UInput v-model.number="testForm.breakingCount" type="number" :min="1" :max="200" class="w-full" />
+              </UFormField>
+              <UFormField label="Choreo" name="choreoCount">
+                <UInput v-model.number="testForm.choreoCount" type="number" :min="1" :max="200" class="w-full" />
+              </UFormField>
+            </div>
+            <p class="text-xs text-gray-500">
+              Judges: Joseph Go (1001), Link (1004), Jimmy Yudat (1005) → Hip Hop + Breaking ·
+              Kris (1002), Mamson (1003) → Choreo · Host: Dulk (2001)
+            </p>
+            <div class="flex gap-2 justify-end">
+              <UButton variant="ghost" @click="showTestCreate = false" class="cursor-pointer">Cancel</UButton>
+              <UButton type="submit" :loading="savingTest" class="cursor-pointer">Create</UButton>
+            </div>
+          </UForm>
+          <p v-if="testCreateError" class="text-red-400 text-sm mt-2">{{ testCreateError }}</p>
+        </UCard>
+      </template>
+    </UModal>
 
     <!-- Create Event Modal -->
     <UModal v-model:open="showCreate">
@@ -119,6 +170,65 @@ async function loadEvents() {
 }
 
 onMounted(() => loadEvents())
+
+// Test Event
+const showTestCreate = ref(false)
+const savingTest = ref(false)
+const testCreateError = ref('')
+const testForm = reactive({
+  name: 'Test Event',
+  startDate: '',
+  endDate: '',
+  hipHopCount: 30,
+  breakingCount: 30,
+  choreoCount: 30,
+})
+
+function todayStr() {
+  return new Date().toISOString().slice(0, 10)
+}
+function tomorrowStr() {
+  const d = new Date()
+  d.setDate(d.getDate() + 1)
+  return d.toISOString().slice(0, 10)
+}
+
+function openTestCreate() {
+  Object.assign(testForm, {
+    name: 'Test Event',
+    startDate: todayStr(),
+    endDate: tomorrowStr(),
+    hipHopCount: 30,
+    breakingCount: 30,
+    choreoCount: 30,
+  })
+  testCreateError.value = ''
+  showTestCreate.value = true
+}
+
+async function handleTestCreate() {
+  savingTest.value = true
+  testCreateError.value = ''
+  try {
+    const ev = await $fetch<{ id: string; name: string }>('/api/events/test' as string, {
+      method: 'POST',
+      body: {
+        name: testForm.name,
+        startDate: new Date(testForm.startDate).toISOString(),
+        endDate: new Date(testForm.endDate).toISOString(),
+        hipHopCount: testForm.hipHopCount,
+        breakingCount: testForm.breakingCount,
+        choreoCount: testForm.choreoCount,
+      },
+    })
+    showTestCreate.value = false
+    navigateTo(`/organizer/events/${(ev as any).id}`)
+  } catch (e: any) {
+    testCreateError.value = e?.data?.statusMessage || 'Failed to create test event'
+  } finally {
+    savingTest.value = false
+  }
+}
 
 // Create
 const showCreate = ref(false)
