@@ -93,7 +93,7 @@ export default defineEventHandler(async (event) => {
         data: { status: 'preselection' },
       })
 
-      return { success: true, phase: 'preselection', firstParticipantId: shuffled[0].participantId }
+      return { success: true, phase: 'preselection', firstParticipantId: ordered[0].participantId }
     }
 
     case 'set-current-participant': {
