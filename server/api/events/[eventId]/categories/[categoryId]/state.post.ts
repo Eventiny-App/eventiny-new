@@ -65,11 +65,15 @@ export default defineEventHandler(async (event) => {
         throw createError({ statusCode: 400, statusMessage: 'No participants registered in this category' })
       }
 
-      // Randomize participant order
-      const shuffled = [...category.participantCategories].sort(() => Math.random() - 0.5)
-      for (let i = 0; i < shuffled.length; i++) {
+      // Build ordered list respecting pinnedPositions (random fill for unpinned)
+      const ordered = buildPreselectionOrder(
+        category.participantCategories,
+        () => Math.random() - 0.5,
+      )
+
+      for (let i = 0; i < ordered.length; i++) {
         await prisma.participantCategory.update({
-          where: { id: shuffled[i].id },
+          where: { id: ordered[i].id },
           data: { orderPosition: i + 1 },
         })
       }
@@ -79,7 +83,7 @@ export default defineEventHandler(async (event) => {
         where: { id: state.id },
         data: {
           phase: 'preselection',
-          currentParticipantId: shuffled[0].participantId,
+          currentParticipantId: ordered[0].participantId,
           ...(timerDuration ? { timerDuration } : {}),
         },
       })

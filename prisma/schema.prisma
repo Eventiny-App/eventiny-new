@@ -105,10 +105,11 @@ model Participant {
 // ─── Participant ↔ Category (M:N) ───────────────────────────
 
 model ParticipantCategory {
-  id            String   @id @default(cuid())
-  orderPosition Int?     // set when category is opened (random), late = appended
-  withdrawn     Boolean  @default(false) // soft-delete: true if removed after category started
-  registeredAt  DateTime @default(now())
+  id             String   @id @default(cuid())
+  orderPosition  Int?     // set when category is opened (random), late = appended
+  pinnedPosition Int?     // organizer-requested slot; respected during shuffle (null = random)
+  withdrawn      Boolean  @default(false) // soft-delete: true if removed after category started
+  registeredAt   DateTime @default(now())
 
   participantId String
   participant   Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)

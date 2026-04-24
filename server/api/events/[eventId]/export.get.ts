@@ -79,7 +79,14 @@ export default defineEventHandler(async (event) => {
           choreoThemes: { orderBy: { sortOrder: 'asc' } },
           participantCategories: {
             where: { withdrawn: false },
-            include: { participant: { select: { id: true, name: true } } },
+            select: {
+              id: true,
+              orderPosition: true,
+              pinnedPosition: true,
+              registeredAt: true,
+              participantId: true,
+              participant: { select: { id: true, name: true } },
+            },
           },
           judgeCategories: {
             include: { judge: { select: { id: true, name: true } } },
@@ -101,11 +108,12 @@ export default defineEventHandler(async (event) => {
     const themes = category.choreoThemes
     const phase = category.categoryState?.phase || 'idle'
 
-    // Sort participants: orderPosition asc (nulls last), then registeredAt asc
+    // Sort participants by their assigned preselection order.
+    // orderPosition is set when preselection starts (or when a participant is added/re-added after start).
+    // Nulls last (safety fallback for any edge case), tiebreak by registeredAt.
     const sortedPcs = [...category.participantCategories].sort((a, b) => {
-      if (a.orderPosition === null && b.orderPosition === null) {
+      if (a.orderPosition === null && b.orderPosition === null)
         return new Date(a.registeredAt).getTime() - new Date(b.registeredAt).getTime()
-      }
       if (a.orderPosition === null) return 1
       if (b.orderPosition === null) return -1
       return a.orderPosition - b.orderPosition

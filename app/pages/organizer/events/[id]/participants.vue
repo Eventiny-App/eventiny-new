@@ -71,16 +71,33 @@
 
               <UFormField label="Categories" help="Select which categories this participant competes in. If a category has already started, they will be appended at the end of the order.">
                 <div class="space-y-2">
-                  <div v-for="cat in categories" :key="cat.id" class="flex items-center gap-3">
-                    <UCheckbox
-                      :model-value="form.selectedCategoryIds.includes(cat.id)"
-                      :disabled="isEditing && editingOriginalCatIds.includes(cat.id) && getPhase(cat.id) !== 'idle'"
-                      @update:model-value="(v: boolean) => toggleCategory(cat.id, v)"
-                    />
-                    <span class="text-sm" :class="{ 'opacity-50': isEditing && editingOriginalCatIds.includes(cat.id) && getPhase(cat.id) !== 'idle' }">{{ cat.name }}</span>
-                    <UBadge :color="cat.type === 'battle' ? 'error' : 'info'" variant="subtle" size="xs">{{ cat.type }}</UBadge>
-                    <UBadge v-if="getPhase(cat.id) !== 'idle'" variant="outline" size="xs">{{ formatPhase(getPhase(cat.id)) }}</UBadge>
-                    <span v-if="isEditing && editingOriginalCatIds.includes(cat.id) && getPhase(cat.id) !== 'idle'" class="text-xs text-yellow-400">locked</span>
+                  <div v-for="cat in categories" :key="cat.id" class="space-y-1">
+                    <div class="flex items-center gap-3">
+                      <UCheckbox
+                        :model-value="form.selectedCategoryIds.includes(cat.id)"
+                        :disabled="isEditing && editingOriginalCatIds.includes(cat.id) && getPhase(cat.id) !== 'idle'"
+                        @update:model-value="(v: boolean) => toggleCategory(cat.id, v)"
+                      />
+                      <span class="text-sm" :class="{ 'opacity-50': isEditing && editingOriginalCatIds.includes(cat.id) && getPhase(cat.id) !== 'idle' }">{{ cat.name }}</span>
+                      <UBadge :color="cat.type === 'battle' ? 'error' : 'info'" variant="subtle" size="xs">{{ cat.type }}</UBadge>
+                      <UBadge v-if="getPhase(cat.id) !== 'idle'" variant="outline" size="xs">{{ formatPhase(getPhase(cat.id)) }}</UBadge>
+                      <span v-if="isEditing && editingOriginalCatIds.includes(cat.id) && getPhase(cat.id) !== 'idle'" class="text-xs text-yellow-400">locked</span>
+                    </div>
+                    <div
+                      v-if="form.selectedCategoryIds.includes(cat.id) && getPhase(cat.id) === 'idle'"
+                      class="flex items-center gap-2 pl-7"
+                    >
+                      <label class="text-xs text-gray-400 shrink-0">Position:</label>
+                      <UInput
+                        v-model="form.pinnedPositions[cat.id]"
+                        type="number"
+                        min="1"
+                        placeholder="Any"
+                        class="w-24"
+                        size="sm"
+                      />
+                      <span class="text-xs text-gray-500">Leave blank for random</span>
+                    </div>
                   </div>
                   <p v-if="categories.length === 0" class="text-xs text-gray-500">No categories created yet.</p>
                 </div>
@@ -171,6 +188,7 @@ const editingOriginalCatIds = ref<string[]>([])
 const form = reactive({
   name: '',
   selectedCategoryIds: [] as string[],
+  pinnedPositions: {} as Record<string, string>,
 })
 
 function openCreate() {
@@ -178,6 +196,7 @@ function openCreate() {
   editingId.value = ''
   form.name = ''
   form.selectedCategoryIds = []
+  form.pinnedPositions = {}
   editingOriginalCatIds.value = []
   formError.value = ''
   showModal.value = true
@@ -202,6 +221,11 @@ function openEdit(p: any) {
     .map((pc: any) => pc.category.id)
   form.selectedCategoryIds = [...activeIds]
   editingOriginalCatIds.value = [...activeIds]
+  const positions: Record<string, string> = {}
+  for (const pc of p.participantCategories.filter((pc: any) => !pc.withdrawn)) {
+    positions[pc.category.id] = pc.pinnedPosition != null ? String(pc.pinnedPosition) : ''
+  }
+  form.pinnedPositions = positions
   formError.value = ''
   showModal.value = true
 }
@@ -213,9 +237,15 @@ async function handleSave() {
     if (isEditing.value) {
       const addCategoryIds = form.selectedCategoryIds.filter(id => !editingOriginalCatIds.value.includes(id))
       const removeCategoryIds = editingOriginalCatIds.value.filter(id => !form.selectedCategoryIds.includes(id))
+      const pinnedPositions = Object.entries(form.pinnedPositions)
+        .filter(([catId]) => form.selectedCategoryIds.includes(catId) && getPhase(catId) === 'idle')
+        .map(([categoryId, val]) => ({
+          categoryId,
+          position: val !== '' && !isNaN(Number(val)) ? parseInt(val) : null,
+        }))
       await $fetch(`/api/events/${eventId}/participants/${editingId.value}`, {
         method: 'PATCH',
-        body: { name: form.name, addCategoryIds, removeCategoryIds },
+        body: { name: form.name, addCategoryIds, removeCategoryIds, pinnedPositions },
       })
     } else {
       await $fetch(`/api/events/${eventId}/participants`, {
