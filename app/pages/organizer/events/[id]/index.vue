@@ -226,18 +226,17 @@ const route = useRoute()
 const eventId = route.params.id as string
 const { logout, fetchMe, isOrganizer, isAdmin } = useAuth()
 
-onMounted(async () => {
-  await fetchMe()
-  if (!isOrganizer.value && !isAdmin.value) navigateTo('/')
-})
-
 const eventData = ref<any>(null)
 
 async function loadEvent() {
   eventData.value = await $fetch(`/api/events/${eventId}`)
 }
 
-onMounted(() => loadEvent())
+onMounted(async () => {
+  await fetchMe()
+  if (!isOrganizer.value && !isAdmin.value) navigateTo('/')
+  await loadEvent()
+})
 
 // Delete
 const showDeleteConfirm = ref(false)
