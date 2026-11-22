@@ -21,7 +21,7 @@ export default defineEventHandler(async (event) => {
     where: { id: participantId },
     include: {
       participantCategories: {
-        include: { category: { select: { id: true, status: true, categoryState: true } } },
+        include: { category: { select: { id: true, name: true, status: true, categoryState: true } } },
       },
     },
   })
@@ -113,7 +113,7 @@ export default defineEventHandler(async (event) => {
       })
 
       if (catState && catState.phase !== 'idle') {
-        throw createError({ statusCode: 400, statusMessage: `Cannot remove participant from category "${catId}": it has already started (${catState.phase})` })
+        throw createError({ statusCode: 400, statusMessage: `Cannot remove "${participant.name}" from "${pc.category.name}": the category has already started (${catState.phase}). Reset it to idle from the host panel first ("Reset Category to Idle"). Warning: this deletes all its votes.` })
       } else {
         await prisma.participantCategory.delete({
           where: { id: pc.id },

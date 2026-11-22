@@ -23,9 +23,13 @@ export default defineEventHandler(async (event) => {
   )
 
   if (startedCategories.length > 0) {
+    const names = startedCategories
+      .map((pc) => `"${pc.category.name}" (${pc.category.categoryState!.phase})`)
+      .join(', ')
+    const plural = startedCategories.length > 1
     throw createError({
       statusCode: 409,
-      statusMessage: `Cannot delete: participant is in ${startedCategories.length} active category(ies). Withdraw them from those categories first.`,
+      statusMessage: `Cannot delete "${participant.name}": they are registered in ${plural ? 'categories that have' : 'a category that has'} already started: ${names}. To remove them, reset ${plural ? 'those categories' : 'the category'} to idle from the host panel ("Reset Category to Idle"). Warning: this deletes all votes in ${plural ? 'those categories' : 'that category'}.`,
     })
   }
 

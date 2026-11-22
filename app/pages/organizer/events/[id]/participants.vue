@@ -83,6 +83,13 @@
                       <UBadge v-if="getPhase(cat.id) !== 'idle'" variant="outline" size="xs">{{ formatPhase(getPhase(cat.id)) }}</UBadge>
                       <span v-if="isEditing && editingOriginalCatIds.includes(cat.id) && getPhase(cat.id) !== 'idle'" class="text-xs text-yellow-400">locked</span>
                     </div>
+                    <p
+                      v-if="isEditing && editingOriginalCatIds.includes(cat.id) && getPhase(cat.id) !== 'idle'"
+                      class="text-xs text-yellow-400/80 pl-7"
+                    >
+                      This category has already started ({{ formatPhase(getPhase(cat.id)) }}), so the participant can't be removed from it.
+                      To remove them, reset the category to idle from the host panel ("Reset Category to Idle"). This deletes all its votes.
+                    </p>
                     <div
                       v-if="form.selectedCategoryIds.includes(cat.id) && getPhase(cat.id) === 'idle'"
                       class="flex items-center gap-2 pl-7"
